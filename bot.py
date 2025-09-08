@@ -63,6 +63,8 @@ class AddGathererView(discord.ui.View):
     @discord.ui.button(label="Hunting", style=discord.ButtonStyle.secondary)
     async def add_Hunter(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Hunter Selected!", view=AddGathererView(), ephemeral=True)
+        
+class AddProcessing(discord.ui.View):
 
     @discord.ui.button(label="Stonemasonry", style=discord.ButtonStyle.secondary)
     async def add_Stonemasonry(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -98,10 +100,51 @@ class AddGathererView(discord.ui.View):
 
     @discord.ui.button(label="Cooking", style=discord.ButtonStyle.secondary)
     async def add_Cook(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Cook Selected!", view=AddGathererView(), ephemeral=True)
+        await interaction.response.send_message("Your Cooked!", view=AddGathererView(), ephemeral=True)
+
+class AddCraftingProfessionView(discord.ui.View):
+    @discord.ui.button(label="Arcane Engineering", style=discord.ButtonStyle.secondary)
+    async def add_ArcaneEngineer(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Arcane Engi Selected!", view=AddGathererView(), ephemeral=True)
+    
+    @discord.ui.button(label="Armor Smithing", style=discord.ButtonStyle.secondary)
+    async def add_ArmorSmithing(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Armor Smithy Selected!", view=AddGathererView(), ephemeral=True)
+
+    @discord.ui.button(label="Carpentry", style=discord.ButtonStyle.secondary)
+    async def add_Carpenter(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Carpenter Selected!", view=AddGathererView(), ephemeral=True)
+
+    @discord.ui.button(label="Jewelry", style=discord.ButtonStyle.secondary)
+    async def add_Jeweler(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Jeweler Selected!", view=AddGathererView(), ephemeral=True)
+
+    @discord.ui.button(label="Leatherworking", style=discord.ButtonStyle.secondary)
+    async def add_Leatherworker(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("LeatherWorking Selected!", view=AddGathererView(), ephemeral=True)
+
+    @discord.ui.button(label="Scribing", style=discord.ButtonStyle.secondary)
+    async def add_Scriber(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Scriber Selected!", view=AddGathererView(), ephemeral=True)
+
+    @discord.ui.button(label="Tailoring", style=discord.ButtonStyle.secondary)
+    async def add_Tailoring(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Tailor Selected!", view=AddGathererView(), ephemeral=True)
+    
+    @discord.ui.button(label="Weapon Smithing", style=discord.ButtonStyle.secondary)
+    async def add_WeaponSmithy(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Weapon Smith Selected!", view=AddGathererView(), ephemeral=True)
 
 class AddArtisanView(discord.ui.View):
-    @discord.ui.button(label="Weaving", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Gathering Profession", style=discord.ButtonStyle.secondary)
+    async def add_GatherProfession(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Weaver Selected!", view=AddGathererView(), ephemeral=True)
+
+    @discord.ui.button(label="Processing Profession", style=discord.ButtonStyle.secondary)
+    async def add_Gatherer(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Weaver Selected!", view=AddGathererView(), ephemeral=True)
+    
+    @discord.ui.button(label="Crafting Profession", style=discord.ButtonStyle.secondary)
     async def add_Gatherer(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Weaver Selected!", view=AddGathererView(), ephemeral=True)
 
