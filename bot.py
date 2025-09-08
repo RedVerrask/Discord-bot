@@ -72,13 +72,18 @@ artisan_registry = {
 }
 
 def set_user_profession(user_id: int, new_profession: str):
-    # Remove from any previous profession
-    for profession, members in artisan_registry.items():
+    # Remove user from any old profession
+    for members in artisan_registry.values():
         if user_id in members:
             members.remove(user_id)
 
-    # Add to the new profession
+    # Make sure the profession exists
+    if new_profession not in artisan_registry:
+        artisan_registry[new_profession] = []
+
+    # Add to new profession
     artisan_registry[new_profession].append(user_id)
+
 
 
 class AddGathererView(discord.ui.View):
@@ -89,9 +94,9 @@ class AddGathererView(discord.ui.View):
         #Add user to profession if not already added
         if user_id not in artisan_registry[""]:
         
-            await interaction.response.send_message("You have joined the Mining profession!", ephemeral=True)
+            await interaction.response.send_message("You have joined the Mining profession!", view=HomeView, ephemeral=True)
         else:
-            await interaction.response.send_message("You've now joined the miner profession! screw the other profession anyways.", ephemeral=True)
+            await interaction.response.send_message("You've now joined the miner profession! screw the other profession anyways.", view=HomeView, ephemeral=True)
 
     
     @discord.ui.button(label="Lumberjacking", style=discord.ButtonStyle.secondary)
