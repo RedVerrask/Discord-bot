@@ -153,11 +153,11 @@ class AddArtisanView(discord.ui.View):
         await interaction.response.send_message("Gather Profession Selected!", view=AddGathererView(), ephemeral=True)
 
     @discord.ui.button(label="Processing Profession", style=discord.ButtonStyle.secondary)
-    async def add_Gatherer(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def add_ProcessingProfession(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Processing Profession Selected!", view=AddProcessingView(), ephemeral=True)
     
     @discord.ui.button(label="Crafting Profession", style=discord.ButtonStyle.secondary)
-    async def add_Gatherer(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def add_CraftingProfession(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Crafter Selected!", view=AddCraftingProfessionView(), ephemeral=True)
 
     @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary)
