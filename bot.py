@@ -99,117 +99,186 @@ class AddGathererView(discord.ui.View):
     async def add_LumberJacking(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("LumberJacker Selected!", view=HomeView(), ephemeral=True)
         user_id = interaction.user.id
-        set_user_profession(user_id, "Mining")
+        set_user_profession(user_id, button.label)
         #Add user to profession if not already added
-        await interaction.response.send_message(" You are now a **Miner**!", view=HomeView(), ephemeral=True)
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Fishing", style=discord.ButtonStyle.secondary)
     async def add_Fisher(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Fishing Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
     
     @discord.ui.button(label="Herbalism", style=discord.ButtonStyle.secondary)
     async def add_Herbing(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Herber Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Hunting", style=discord.ButtonStyle.secondary)
     async def add_Hunter(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Hunter Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="back?", style=discord.ButtonStyle.secondary)
     async def add_back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Which Profession?", view=AddArtisanView(), ephemeral=True)
+        await interaction.response.send_message("back?", view=HomeView(), ephemeral=True)
         
 class AddProcessingView(discord.ui.View):
 
     @discord.ui.button(label="Stonemasonry", style=discord.ButtonStyle.secondary)
     async def add_Stonemasonry(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Stoney Masey Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Tanning", style=discord.ButtonStyle.secondary)
     async def add_Tanner(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Tanner Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Weaving", style=discord.ButtonStyle.secondary)
     async def add_Weaver(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Weaver Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Metalworking", style=discord.ButtonStyle.secondary)
     async def add_Metalworker(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Metalworker Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Farming", style=discord.ButtonStyle.secondary)
     async def add_Farmer(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Farmer Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
     
     @discord.ui.button(label="Lumber Milling", style=discord.ButtonStyle.secondary)
     async def add_LumberMilling(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Lumber Miller Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Alchemy", style=discord.ButtonStyle.secondary)
     async def add_Alchemy(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Alchemy Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Animal Husbandry", style=discord.ButtonStyle.secondary)
     async def add_Anm_Hus(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Animal Breeder Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Cooking", style=discord.ButtonStyle.secondary)
     async def add_Cook(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Your Cooked!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="back?", style=discord.ButtonStyle.secondary)
     async def add_back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Which Profession?", view=AddArtisanView(), ephemeral=True)
+        await interaction.response.send_message("back?", view=HomeView(), ephemeral=True)
 
 class AddCraftingProfessionView(discord.ui.View):
     @discord.ui.button(label="Arcane Engineering", style=discord.ButtonStyle.secondary)
     async def add_ArcaneEngineer(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Arcane Engi Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
     
     @discord.ui.button(label="Armor Smithing", style=discord.ButtonStyle.secondary)
     async def add_ArmorSmithing(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Armor Smithy Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Carpentry", style=discord.ButtonStyle.secondary)
     async def add_Carpenter(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Carpenter Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Jewelry", style=discord.ButtonStyle.secondary)
     async def add_Jeweler(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Jeweler Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Leatherworking", style=discord.ButtonStyle.secondary)
     async def add_Leatherworker(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("LeatherWorking Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Scribing", style=discord.ButtonStyle.secondary)
     async def add_Scriber(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Scriber Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Tailoring", style=discord.ButtonStyle.secondary)
     async def add_Tailoring(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Tailor Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
     
     @discord.ui.button(label="Weapon Smithing", style=discord.ButtonStyle.secondary)
     async def add_WeaponSmithy(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Weapon Smith Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
     
     @discord.ui.button(label="back?", style=discord.ButtonStyle.secondary)
     async def add_back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Which Profession?", view=AddArtisanView(), ephemeral=True)
+        await interaction.response.send_message("back?", view=HomeView(), ephemeral=True)
 
 class AddArtisanView(discord.ui.View):
     @discord.ui.button(label="Gathering Profession", style=discord.ButtonStyle.secondary)
     async def add_GatherProfession(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Gather Profession Selected!", view=AddGathererView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Processing Profession", style=discord.ButtonStyle.secondary)
     async def add_ProcessingProfession(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Processing Profession Selected!", view=AddProcessingView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
     
     @discord.ui.button(label="Crafting Profession", style=discord.ButtonStyle.secondary)
     async def add_CraftingProfession(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Crafter Selected!", view=AddCraftingProfessionView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, button.label)
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary)
     async def add_Back(self, interaction: discord.Interaction, button: discord.ui.Button):
