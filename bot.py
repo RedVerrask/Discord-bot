@@ -93,8 +93,6 @@ class AddGathererView(discord.ui.View):
         else:
             await interaction.response.send_message("You've now joined the miner profession! screw the other profession anyways.", ephemeral=True)
 
-
-        await interaction.response.send_message("Miner Selected!", view=HomeView(), ephemeral=True)
     
     @discord.ui.button(label="Lumberjacking", style=discord.ButtonStyle.secondary)
     async def add_LumberJacking(self, interaction: discord.Interaction, button: discord.ui.Button):
