@@ -90,14 +90,18 @@ class AddGathererView(discord.ui.View):
     @discord.ui.button(label="Mining", style=discord.ButtonStyle.secondary)
     async def add_Miner(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        set_user_profession(user_id, "Mining")
+        set_user_profession(user_id, button.label)
         #Add user to profession if not already added
-        await interaction.response.send_message(" You are now a **Miner**!", view=HomeView(), ephemeral=True)
+        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     
     @discord.ui.button(label="Lumberjacking", style=discord.ButtonStyle.secondary)
     async def add_LumberJacking(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("LumberJacker Selected!", view=HomeView(), ephemeral=True)
+        user_id = interaction.user.id
+        set_user_profession(user_id, "Mining")
+        #Add user to profession if not already added
+        await interaction.response.send_message(" You are now a **Miner**!", view=HomeView(), ephemeral=True)
 
     @discord.ui.button(label="Fishing", style=discord.ButtonStyle.secondary)
     async def add_Fisher(self, interaction: discord.Interaction, button: discord.ui.Button):
