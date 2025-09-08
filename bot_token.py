@@ -1,0 +1,2 @@
+# bot_token.py
+TOKEN = "MTQxNDE2ODg0MzUwMDM4ODQyNA.Gm3YoZ.FaRLywMLin7Vy-rwG2zqYbiFKgc7_v8yJ83S3M"
