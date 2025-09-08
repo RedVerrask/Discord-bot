@@ -162,7 +162,7 @@ class AddArtisanView(discord.ui.View):
 
     @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary)
     async def add_Back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Crafter Selected!", view=HomeView ephemeral=True)
+        await interaction.response.send_message("Crafter Selected!", view=HomeView(), ephemeral=True)
         
 
 class ArtisanView(discord.ui.View):
