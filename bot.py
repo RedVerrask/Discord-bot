@@ -261,24 +261,15 @@ class AddCraftingProfessionView(discord.ui.View):
 class AddArtisanView(discord.ui.View):
     @discord.ui.button(label="Gathering Profession", style=discord.ButtonStyle.secondary)
     async def add_GatherProfession(self, interaction: discord.Interaction, button: discord.ui.Button):
-        user_id = interaction.user.id
-        set_user_profession(user_id, button.label)
-        #Add user to profession if not already added
-        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
+        await interaction.response.send_message(" Gathering: ", view=AddGathererView(), ephemeral=True)
 
     @discord.ui.button(label="Processing Profession", style=discord.ButtonStyle.secondary)
     async def add_ProcessingProfession(self, interaction: discord.Interaction, button: discord.ui.Button):
-        user_id = interaction.user.id
-        set_user_profession(user_id, button.label)
-        #Add user to profession if not already added
-        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
+        await interaction.response.send_message(" Processing: ", view=AddProcessingView(), ephemeral=True)
     
     @discord.ui.button(label="Crafting Profession", style=discord.ButtonStyle.secondary)
     async def add_CraftingProfession(self, interaction: discord.Interaction, button: discord.ui.Button):
-        user_id = interaction.user.id
-        set_user_profession(user_id, button.label)
-        #Add user to profession if not already added
-        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
+        await interaction.response.send_message(" Crafting: ", view=AddCraftingProfessionView(), ephemeral=True)
 
     @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary)
     async def add_Back(self, interaction: discord.Interaction, button: discord.ui.Button):
