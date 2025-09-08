@@ -84,4 +84,4 @@ async def on_ready():
     await bot.tree.sync()
     print(f"Logged in as {bot.user}")
 
-bot.run(os.environ('DISCORD_TOKEN'))
+bot.run(os.environ['DISCORD_TOKEN'])
