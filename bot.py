@@ -21,7 +21,7 @@ class HomeView(discord.ui.View):
     #artisan menu
     @discord.ui.button(label="Artisan", style=discord.ButtonStyle.secondary)
     async def artisan_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Artisan Menu:", view=ArtisanView(), ephemeral=True)
+        await interaction.response.send_message("Artisan Menu:", view=AddArtisanView(), ephemeral=True)
         
             
     @discord.ui.button(label="Recipes", style=discord.ButtonStyle.primary)
@@ -150,15 +150,15 @@ class AddCraftingProfessionView(discord.ui.View):
 class AddArtisanView(discord.ui.View):
     @discord.ui.button(label="Gathering Profession", style=discord.ButtonStyle.secondary)
     async def add_GatherProfession(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Weaver Selected!", view=AddGathererView(), ephemeral=True)
+        await interaction.response.send_message("Gather Profession Selected!", view=AddGathererView(), ephemeral=True)
 
     @discord.ui.button(label="Processing Profession", style=discord.ButtonStyle.secondary)
     async def add_Gatherer(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Weaver Selected!", view=AddGathererView(), ephemeral=True)
+        await interaction.response.send_message("Processing Profession Selected!", view=AddProcessing(), ephemeral=True)
     
     @discord.ui.button(label="Crafting Profession", style=discord.ButtonStyle.secondary)
     async def add_Gatherer(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Weaver Selected!", view=AddGathererView(), ephemeral=True)
+        await interaction.response.send_message("Crafter Selected!", view=AddCraftingProfessionView(), ephemeral=True)
 
     @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary)
     async def add_Back(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -176,7 +176,7 @@ class ArtisanView(discord.ui.View):
 
     @discord.ui.button(label="Change Artisan", style=discord.ButtonStyle.secondary)
     async def change_artisan(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("You chose to Change an artisan!", ephemeral=True)
+        await interaction.response.send_message("You chose to Change an artisan!", view=AddArtisanView(), ephemeral=True)
 
     @discord.ui.button(label="View Artisans", style=discord.ButtonStyle.secondary)
     async def view_artisans(self, interaction: discord.Interaction, button: discord.ui.Button):
