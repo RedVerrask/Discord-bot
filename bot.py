@@ -63,6 +63,10 @@ class AddGathererView(discord.ui.View):
     @discord.ui.button(label="Hunting", style=discord.ButtonStyle.secondary)
     async def add_Hunter(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Hunter Selected!", view=AddGathererView(), ephemeral=True)
+
+    @discord.ui.button(label="back?", style=discord.ButtonStyle.secondary)
+    async def add_back(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Which Profession?", view=AddArtisanView(), ephemeral=True)
         
 class AddProcessing(discord.ui.View):
 
@@ -102,6 +106,10 @@ class AddProcessing(discord.ui.View):
     async def add_Cook(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Your Cooked!", view=AddGathererView(), ephemeral=True)
 
+    @discord.ui.button(label="back?", style=discord.ButtonStyle.secondary)
+    async def add_back(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Which Profession?", view=AddArtisanView(), ephemeral=True)
+
 class AddCraftingProfessionView(discord.ui.View):
     @discord.ui.button(label="Arcane Engineering", style=discord.ButtonStyle.secondary)
     async def add_ArcaneEngineer(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -134,6 +142,10 @@ class AddCraftingProfessionView(discord.ui.View):
     @discord.ui.button(label="Weapon Smithing", style=discord.ButtonStyle.secondary)
     async def add_WeaponSmithy(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Weapon Smith Selected!", view=AddGathererView(), ephemeral=True)
+    
+    @discord.ui.button(label="back?", style=discord.ButtonStyle.secondary)
+    async def add_back(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Which Profession?", view=AddArtisanView(), ephemeral=True)
 
 class AddArtisanView(discord.ui.View):
     @discord.ui.button(label="Gathering Profession", style=discord.ButtonStyle.secondary)
