@@ -92,11 +92,7 @@ class AddGathererView(discord.ui.View):
         user_id = interaction.user.id
         set_user_profession(user_id, "Mining")
         #Add user to profession if not already added
-        if user_id not in artisan_registry[""]:
-        
-            await interaction.response.send_message("You have joined the Mining profession!", view=HomeView, ephemeral=True)
-        else:
-            await interaction.response.send_message("You've now joined the miner profession! screw the other profession anyways.", view=HomeView, ephemeral=True)
+        await interaction.response.send_message(" You are now a **Miner**!", view=HomeView(), ephemeral=True)
 
     
     @discord.ui.button(label="Lumberjacking", style=discord.ButtonStyle.secondary)
