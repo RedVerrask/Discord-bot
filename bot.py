@@ -21,7 +21,8 @@ class HomeView(discord.ui.View):
     #artisan menu
     @discord.ui.button(label="Artisan", style=discord.ButtonStyle.secondary)
     async def artisan_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Artisan Menu:", ephemeral=True)
+        await interaction.response.send_message("Artisan Menu:", view=ArtisanView(), ephemeral=True)
+        
             
     @discord.ui.button(label="Recipes", style=discord.ButtonStyle.primary)
     async def recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -43,7 +44,7 @@ class RecipeView(discord.ui.View):
         await interaction.response.send_message("Here are your recipes:\n- Example Recipe 1\n- Example Recipe 2", ephemeral=True)
 
 class ArtisanView(discord.ui.View):
-    def __innit__(self):
+    def __init__(self):
         super().__init__(timeout=None)
 
     @discord.ui.button(label="Add Artisan", style=discord.ButtonStyle.secondary)
@@ -51,11 +52,11 @@ class ArtisanView(discord.ui.View):
         await interaction.response.send_message("You chose to add an artisan!", ephemeral=True)
 
     @discord.ui.button(label="Change Artisan", style=discord.ButtonStyle.secondary)
-    async def add_artisan(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def change_artisan(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("You chose to Change an artisan!", ephemeral=True)
 
     @discord.ui.button(label="View Artisans", style=discord.ButtonStyle.secondary)
-    async def add_artisan(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def view_artisans(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("You chose to View an artisan!", ephemeral=True)
 
 @bot.tree.command(name="home", description="Open your guild home menu")
