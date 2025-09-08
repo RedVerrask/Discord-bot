@@ -8,7 +8,6 @@ import asyncio  # make sure this is at the top of your file
 intents = discord.Intents.default()
 intents.message_content = True # Needed to read messages
 intents.members = True # usefule for guild bots
-client = discord.Client()
 bot = commands.Bot(command_prefix="!", intents=intents)
 ADMIN_USER_IDS = [359521236663009293]  # Replace with your actual Discord user ID
 
@@ -85,4 +84,4 @@ async def on_ready():
     await bot.tree.sync()
     print(f"Logged in as {bot.user}")
 
-client.run(os.environ('DISCORD_TOKEN'))
+bot.run(os.environ('DISCORD_TOKEN'))
