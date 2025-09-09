@@ -13,11 +13,13 @@ intents.members = True # usefule for guild bots
 bot = commands.Bot(command_prefix="!", intents=intents)
 ADMIN_USER_IDS = [359521236663009293]  # Replace with your actual Discord user ID
 
+# Enum for predefined recipes
+class Recipes(str, Enum):
+    POTION = "Potion of Healing"
+    SWORD = "Iron Sword"
+    ELIXIR = "Mana Elixir"
 
-
-with open("recipes.json", "r", encoding="utf-8") as f:
-    recipes = json.load(f)
-
+# Initialize SQLite DB
 def init_db():
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
@@ -32,27 +34,9 @@ def init_db():
     conn.commit()
     conn.close()
 
-class Recipes(str, Enum):
-    POTION = "Potion of Healing"
-    SWORD = "Iron Sword"
-    ELIXIR = "Mana Elixir"
-
-def init_db():
-    conn = sqlite3.connect("recipes.db")
-    c = conn.cursor()
-    c.execute("""CREATE TABLE IF NOT EXISTS recipes (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, profession TEXT NOT NULL, recipe_name TEXT NOT NULL)""")
-    conn.commit()
-    conn.close()
-
 init_db()
 
-@bot.tree.command(name="learn_recipe", description="Learn a recipe")
-@app_commands.describe(recipe="Select a recipe to learn")
-async def learn_recipe(interaction: discord.Interaction, recipe: Recipes):
-    add_recipe(interaction.user.id, recipe.value)
-    await interaction.response.send_message(f"✅ You learned **{recipe.value}**!")
-    
-# Function to add recipe to DB
+# Add a recipe to DB
 def add_recipe(user_id, profession, recipe_name):
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
@@ -63,7 +47,7 @@ def add_recipe(user_id, profession, recipe_name):
     conn.commit()
     conn.close()
 
-# Function to get user recipes
+# Get all recipes learned by a user
 def get_user_recipes(user_id):
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
@@ -72,75 +56,43 @@ def get_user_recipes(user_id):
     conn.close()
     return results
 
-class Recipes(str, Enum):
-    POTION = "Potion of Healing"
-    SWORD = "Iron Sword"
-    ELIXIR = "Mana Elixir"
-
-class HomeView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)  # no timeout
-
-    #artisan menu
-    @discord.ui.button(label="Artisan", style=discord.ButtonStyle.secondary)
-    async def artisan_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Artisan Menu:", view=AddArtisanView(), ephemeral=True)
-        
-            
-    @discord.ui.button(label="Recipes", style=discord.ButtonStyle.primary)
-    async def recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Recipe Menu:", view=RecipeView(), ephemeral=True)
-
-class RecipeSelect(discord.ui.Select):
-    def __init__(self, profession):
-        # filter recipes by profession
-        options = [
-            discord.SelectOption(
-                label=recipe["name"],
-                description=f"Level {recipe['level']}"
-            )
-            for recipe in recipes if recipe["profession"] == profession][:25]  # discord limit: 25 options max
-
-        super().__init__(placeholder="Select a recipe...", options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        selected_recipe = self.values[0]
-        await interaction.response.send_message(
-            f"✅ You learned **{selected_recipe}**!", ephemeral=True
-        )
-        # TODO: save this to crafter's profile
-
-
-
-
-
-class RecipeView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-        for recipe in Recipes:
-            self.add_item(RecipeButton(recipe_name=recipe.value))
-
-    @discord.ui.button(label="Learn Recipe", style=discord.ButtonStyle.success)
-    async def add_recipe(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Please type your recipe:", ephemeral=True)
-
-    @discord.ui.button(label="List Recipes", style=discord.ButtonStyle.primary)
-    async def list_recipes(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # For now, just a placeholder
-        await interaction.response.send_message("Here are your recipes:\n- Example Recipe 1\n- Example Recipe 2", ephemeral=True)
-
+# Button for each Enum recipe
 class RecipeButton(discord.ui.Button):
     def __init__(self, recipe_name):
         super().__init__(label=recipe_name, style=discord.ButtonStyle.success)
         self.recipe_name = recipe_name
 
     async def callback(self, interaction: discord.Interaction):
-        # Example: we’ll just use "Adventurer" as a profession for demo
-        profession = "Adventurer"
+        profession = "Adventurer"  # Default profession
         add_recipe(interaction.user.id, profession, self.recipe_name)
-        await interaction.response.send_message(f"✅ You learned **{self.recipe_name}** as a {profession}!", ephemeral=True)
+        await interaction.response.send_message(
+            f"✅ You learned **{self.recipe_name}** as a {profession}!",
+            ephemeral=True
+        )
 
+# The view that holds all recipe buttons + list button
+class RecipeView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        # Add a button for each recipe in the Enum
+        for recipe in Recipes:
+            self.add_item(RecipeButton(recipe.value))
 
+    @discord.ui.button(label="List Recipes", style=discord.ButtonStyle.primary)
+    async def list_recipes(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_recipes = get_user_recipes(interaction.user.id)
+        if not user_recipes:
+            await interaction.response.send_message("You haven’t learned any recipes yet!", ephemeral=True)
+            return
+
+        recipe_list = "\n".join([f"{prof}: {name}" for prof, name in user_recipes])
+        await interaction.response.send_message(f"📜 Your Recipes:\n{recipe_list}", ephemeral=True)
+
+# Command to display the buttons
+@bot.command()
+async def recipes(ctx):
+    """Show the recipe menu with buttons"""
+    await ctx.send("Click a recipe to learn it or view your learned recipes:", view=RecipeView())
 #Professions
 
 REGISTRY_FILE = "artisan_registry.json"
