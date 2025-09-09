@@ -73,7 +73,9 @@ class AddGathererView(discord.ui.View):
 
     @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary)
     async def go_back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Back to home:", view=HomeView(self.professions_cog), ephemeral=True)
+        # Update the current message with the HomeView instead of sending a new message
+        await interaction.response.edit_message(content="Back to home:", view=HomeView(self.professions_cog))
+
 
 
 # ----- Processing Professions -----
@@ -120,7 +122,8 @@ class AddProcessingView(discord.ui.View):
 
     @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary)
     async def go_back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Back to home:", view=HomeView(self.professions_cog), ephemeral=True)
+        # Update the current message with the HomeView instead of sending a new message
+        await interaction.response.edit_message(content="Back to home:", view=HomeView(self.professions_cog))
 
 
 # ----- Crafting Professions -----
@@ -163,7 +166,8 @@ class AddCraftingView(discord.ui.View):
 
     @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary)
     async def go_back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Back to home:", view=HomeView(self.professions_cog), ephemeral=True)
+        # Update the current message with the HomeView instead of sending a new message
+        await interaction.response.edit_message(content="Back to home:", view=HomeView(self.professions_cog))
 
 
 # ----- Main Add Artisan Menu -----
@@ -191,4 +195,4 @@ class AddArtisanView(discord.ui.View):
 
     @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary)
     async def go_back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Back to home:", view=HomeView(self.professions_cog), ephemeral=True)
+        await interaction.response.edit_message(content="Back to home:", view=HomeView(self.professions_cog))

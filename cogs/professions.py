@@ -10,17 +10,26 @@ class Professions(commands.Cog):
         """Return an embed showing all users and their professions."""
         embed = discord.Embed(title="Current Professions", color=discord.Color.blurple())
 
+        # Profession icons
+        profession_icons = {"Fishing": "🎣", "Herbalism": "🌿", "Hunting": "🏹", "Lumberjacking": "🪓", "Mining": "⛏️",
+        "Alchemy": "⚗️", "Animal Husbandry": "🐄", "Cooking": "🍳", "Farming": "🌾", "Lumber Milling": "🪵",
+        "Metalworking": "⚒️", "Stonemasonry": "🧱", "Tanning": "🪶", "Weaving": "🧵",
+        "Arcane Engineering": "🔮", "Armor Smithing": "🛡️", "Carpentry": "🪑", "Jewelry": "💍",
+        "Leatherworking": "👢", "Scribing": "📜", "Tailoring": "🧶", "Weapon Smithing": "⚔️",}
+
         for profession, members in self.artisan_registry.items():
             if not members:
                 continue
-            member_list = []
-            for user_id, tier in members.items():
-                try:
-                    user = await bot.fetch_user(int(user_id))
-                    member_list.append(f"{user.name} ({tier})")
-                except discord.NotFound:
-                    member_list.append(f"Unknown User ({tier})")
-            embed.add_field(name=profession, value="\n".join(member_list), inline=False)
+        member_list = []
+        for user_id, tier in members.items():
+            try:
+                user = await bot.fetch_user(int(user_id))
+                member_list.append(f"{str(user)} ({tier})")  # Shows unique username
+            except discord.NotFound:
+                member_list.append(f"Unknown User ({tier})")
+        
+        icon = profession_icons.get(profession, "")
+        embed.add_field(name=f"{icon} {profession}", value="\n".join(member_list), inline=False)
 
         return embed
 
