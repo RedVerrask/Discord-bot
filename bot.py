@@ -62,17 +62,13 @@ def fetch_recipes():
         recipes.extend(page_recipes)
         page += 1
 
-    if not recipes:
-        recipes = ["Placeholder Recipe"]  # prevents crash if nothing is scraped
+    if os.path.exists("recipes.json"):
+        with open("recipes.json", "r", encoding="utf-8") as f:
+            recipes_data = json.load(f)
+    else:
+        recipes_data = ["No recipes available"]
 
-    with open("recipes.json", "w", encoding="utf-8") as f:
-        json.dump(recipes, f, ensure_ascii=False, indent=2)
 
-    return recipes
-
-if __name__ == "__main__":
-    all_recipes = fetch_recipes()
-    print(f"Fetched {len(all_recipes)} recipes!")
 
 def add_recipes_to_db(recipes):
     conn = sqlite3.connect("recipes.db")
@@ -550,7 +546,8 @@ class ArtisanView(discord.ui.View):
 
 if __name__ == "__main__":
     init_db()
-
+    all_recipes = fetch_recipes()
+    print(f"Fetched {len(all_recipes)} recipes!")
     # optional: scrape and seed DB once
     # recipes = fetch_recipes()
     # add_recipes_to_db(recipes)
