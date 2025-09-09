@@ -200,22 +200,22 @@ class AddGathererView(discord.ui.View):
     @discord.ui.button(label="Lumberjacking", style=discord.ButtonStyle.secondary)
     async def add_LumberJacking(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Jacking tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Jacking tier:",view=TierSelectView(user_id, "Lumberjacking"),ephemeral=True)
 
     @discord.ui.button(label="Fishing", style=discord.ButtonStyle.secondary)
     async def add_Fisher(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Fishing tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Fishing tier:",view=TierSelectView(user_id, "Fishing"),ephemeral=True)
     
     @discord.ui.button(label="Herbalism", style=discord.ButtonStyle.secondary)
     async def add_Herbing(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Herbalism tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Herbalism tier:",view=TierSelectView(user_id, "Herbalism"),ephemeral=True)
 
     @discord.ui.button(label="Hunting", style=discord.ButtonStyle.secondary)
     async def add_Hunter(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Hunting tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Hunting tier:",view=TierSelectView(user_id, "Hunting"),ephemeral=True)
 
     @discord.ui.button(label="back?", style=discord.ButtonStyle.secondary)
     async def add_back(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -226,47 +226,47 @@ class AddProcessingView(discord.ui.View):
     @discord.ui.button(label="Stonemasonry", style=discord.ButtonStyle.secondary)
     async def add_Stonemasonry(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Stonemasonry tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Stonemasonry tier:",view=TierSelectView(user_id, "Stonemasonry"),ephemeral=True)
 
     @discord.ui.button(label="Tanning", style=discord.ButtonStyle.secondary)
     async def add_Tanner(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Tanning tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Tanning tier:",view=TierSelectView(user_id, "Tanning"),ephemeral=True)
         
     @discord.ui.button(label="Weaving", style=discord.ButtonStyle.secondary)
     async def add_Weaver(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Weaving tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Weaving tier:",view=TierSelectView(user_id, "Weaving"),ephemeral=True)
 
     @discord.ui.button(label="Metalworking", style=discord.ButtonStyle.secondary)
     async def add_Metalworker(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Metalworking tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Metalworking tier:",view=TierSelectView(user_id, "Metalworking"),ephemeral=True)
 
     @discord.ui.button(label="Farming", style=discord.ButtonStyle.secondary)
     async def add_Farmer(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Farming tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Farming tier:",view=TierSelectView(user_id, "Farming"),ephemeral=True)
     
     @discord.ui.button(label="Lumber Milling", style=discord.ButtonStyle.secondary)
     async def add_LumberMilling(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Lumber Milling tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Lumber Milling tier:",view=TierSelectView(user_id, "Lumber Milling"),ephemeral=True)
 
     @discord.ui.button(label="Alchemy", style=discord.ButtonStyle.secondary)
     async def add_Alchemy(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Alchemy tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Alchemy tier:",view=TierSelectView(user_id, "Alchemy"),ephemeral=True)
 
     @discord.ui.button(label="Animal Husbandry", style=discord.ButtonStyle.secondary)
     async def add_Anm_Hus(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Animal Husbandry tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Animal Husbandry tier:",view=TierSelectView(user_id, "Animal Husbandry"),ephemeral=True)
 
     @discord.ui.button(label="Cooking", style=discord.ButtonStyle.secondary)
     async def add_Cook(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Cooking tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Cooking tier:",view=TierSelectView(user_id, "Cooking"),ephemeral=True)
 
     @discord.ui.button(label="back?", style=discord.ButtonStyle.secondary)
     async def add_back(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -276,42 +276,42 @@ class AddCraftingProfessionView(discord.ui.View):
     @discord.ui.button(label="Arcane Engineering", style=discord.ButtonStyle.secondary)
     async def add_ArcaneEngineer(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Arcane Engineering tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Arcane Engineering tier:",view=TierSelectView(user_id, "Arcane Engineering"),ephemeral=True)
     
     @discord.ui.button(label="Armor Smithing", style=discord.ButtonStyle.secondary)
     async def add_ArmorSmithing(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Armor Smithing tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Armor Smithing tier:",view=TierSelectView(user_id, "Armor Smithing"),ephemeral=True)
 
     @discord.ui.button(label="Carpentry", style=discord.ButtonStyle.secondary)
     async def add_Carpenter(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Carpentry tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Carpentry tier:",view=TierSelectView(user_id, "Carpentry"),ephemeral=True)
 
     @discord.ui.button(label="Jewelry", style=discord.ButtonStyle.secondary)
     async def add_Jeweler(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Jewelry tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Jewelry tier:",view=TierSelectView(user_id, "Jewelry"),ephemeral=True)
 
     @discord.ui.button(label="Leatherworking", style=discord.ButtonStyle.secondary)
     async def add_Leatherworker(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your MLeatherworking tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your MLeatherworking tier:",view=TierSelectView(user_id, "Leatherworking"),ephemeral=True)
 
     @discord.ui.button(label="Scribing", style=discord.ButtonStyle.secondary)
     async def add_Scriber(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Scribing tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Scribing tier:",view=TierSelectView(user_id, "Scribing"),ephemeral=True)
 
     @discord.ui.button(label="Tailoring", style=discord.ButtonStyle.secondary)
     async def add_Tailoring(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Tailoring tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Tailoring tier:",view=TierSelectView(user_id, "Tailoring"),ephemeral=True)
     
     @discord.ui.button(label="Weapon Smithing", style=discord.ButtonStyle.secondary)
     async def add_WeaponSmithy(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message("Select your Weapon Smithing tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+        await interaction.response.send_message("Select your Weapon Smithing tier:",view=TierSelectView(user_id, "Weapon Smithing"),ephemeral=True)
     
     @discord.ui.button(label="back?", style=discord.ButtonStyle.secondary)
     async def add_back(self, interaction: discord.Interaction, button: discord.ui.Button):
