@@ -82,7 +82,7 @@ class RecipeSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         recipe_name = self.values[0]
-        profession = "Adventurer"
+        profession = "Adventurer"  # or pull from user profile if you have professions
         add_recipe(interaction.user.id, profession, recipe_name)
         await interaction.response.send_message(
             f"✅ You learned **{recipe_name}** as a {profession}!",
@@ -93,6 +93,25 @@ class RecipeSelectView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(RecipeSelect())
+
+class RecipeMenuView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Learn Recipe", style=discord.ButtonStyle.success)
+    async def learn_recipe_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            "Select a recipe to learn:", view=RecipeSelectView(), ephemeral=True
+        )
+
+    @discord.ui.button(label="View My Recipes", style=discord.ButtonStyle.primary)
+    async def view_recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_recipes = get_user_recipes(interaction.user.id)
+        if not user_recipes:
+            await interaction.response.send_message("You haven’t learned any recipes yet!", ephemeral=True)
+            return
+        recipe_list = "\n".join([f"{prof}: {name}" for prof, name in user_recipes])
+        await interaction.response.send_message(f"📜 Your Recipes:\n{recipe_list}", ephemeral=True)
 
 @bot.tree.command(name="home", description="Open your guild home menu")
 async def home(interaction: discord.Interaction):
