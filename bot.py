@@ -31,15 +31,16 @@ def init_db():
 
 # Function to fetch recipes from Ashes Codex
 def fetch_recipes():
-    url = 'https://ashescodex.com/db/items/consumable/recipe/page/1'
+    url = "https://ashesofcreation.wiki/Recipes"  # adjust to the correct codex page
     response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
+    soup = BeautifulSoup(response.text, "html.parser")
 
-    recipes = []
-    for item in soup.find_all('div', class_='item'):
-        name = item.find('span', class_='name').text.strip()
-        profession = item.find('span', class_='profession').text.strip()
-        recipes.append((name, profession))
+    # Example: get all recipe names from <li> or <a> tags (depends on site structure)
+    recipes = [item.text.strip() for item in soup.select("li a") if item.text.strip()]
+
+    with open("recipes.json", "w", encoding="utf-8") as f:
+        json.dump(recipes, f, ensure_ascii=False, indent=2)
+
     return recipes
 
 # Function to add recipes to the database
@@ -97,14 +98,18 @@ class RecipeButton(discord.ui.Button):
         )
 
         return
+# Load JSON recipes
+with open("recipes.json", "r", encoding="utf-8") as f:
+    recipes_data = json.load(f)
+
 class RecipeSelect(discord.ui.Select):
     def __init__(self):
-        options = [discord.SelectOption(label=recipe.value) for recipe in Recipes]
+        options = [discord.SelectOption(label=recipe) for recipe in recipes_data]
         super().__init__(placeholder="Select a recipe...", options=options)
 
     async def callback(self, interaction: discord.Interaction):
         recipe_name = self.values[0]
-        profession = "Adventurer"  # or pull from user profile if you have professions
+        profession = "Adventurer"
         add_recipe(interaction.user.id, profession, recipe_name)
         await interaction.response.send_message(
             f"✅ You learned **{recipe_name}** as a {profession}!",
