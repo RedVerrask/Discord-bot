@@ -77,20 +77,26 @@ class RecipeSelect(discord.ui.Select):
         )
         # TODO: save this to crafter's profile
 
-@bot.tree.command(name="Learn a recipe", description="Which Recipe?")
-async def learn(ctx, profession: str, *, recipe_name: str):
-    add_recipe(ctx.author.id, profession, recipe_name)
-    await ctx.send(f"✅ {ctx.author.display_name} learned **{recipe_name}** as a {profession}!")
+@bot.tree.command(name="learn_recipe", description="Learn a new recipe")
+async def learn(interaction: discord.Interaction, profession: str, recipe_name: str):
+    add_recipe(interaction.user.id, profession, recipe_name)
+    await interaction.response.send_message(
+        f"✅ {interaction.user.display_name} learned **{recipe_name}** as a {profession}!",
+        ephemeral=True
+    )
 
 
-@bot.tree.command()
-async def myrecipes(ctx):
-    recipes = get_recipes_by_user(ctx.author.id)
+@bot.tree.command(name="myrecipes", description="View your learned recipes")
+async def myrecipes(interaction: discord.Interaction):
+    recipes = get_recipes_by_user(interaction.user.id)
     if not recipes:
-        await ctx.send("You haven’t learned any recipes yet!")
+        await interaction.response.send_message("You haven’t learned any recipes yet!", ephemeral=True)
     else:
         recipe_list = "\n".join([f"{prof}: {name}" for prof, name in recipes])
-        await ctx.send(f"📜 **Your Recipes:**\n{recipe_list}")
+        await interaction.response.send_message(
+            f"📜 **Your Recipes:**\n{recipe_list}",
+            ephemeral=True
+        )
 
 
 
