@@ -153,8 +153,10 @@ if not recipes_data:
     recipes_data = ["No recipes available"]  # fallback
 
 class RecipeSelect(discord.ui.Select):
-    def __init__(self):
-        options = [discord.SelectOption(label=recipe) for recipe in recipes_data]
+    def __init__(self, recipes):
+        if not recipes:
+            raise ValueError("No recipes available for selection")
+        options = [discord.SelectOption(label=recipe) for recipe in recipes]
         super().__init__(placeholder="Select a recipe...", options=options)
 
     async def callback(self, interaction: discord.Interaction):
@@ -167,9 +169,10 @@ class RecipeSelect(discord.ui.Select):
         )
 
 class RecipeSelectView(discord.ui.View):
-    def __init__(self):
+   def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(RecipeSelect())
+        if recipes_data:
+            self.add_item(RecipeSelect(recipes_data))
 
 class RecipeMenuView(discord.ui.View):
     def __init__(self):
