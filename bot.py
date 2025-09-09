@@ -158,7 +158,35 @@ class TierSelectView(discord.ui.View):
 
         await interaction.response.send_message(f"✅ You are now a **{tier} {self.profession}**!",ephemeral=True)
 
+async def format_artisan_registry(bot: discord.Client):
+    embed = discord.Embed(
+        title="⚒️ Artisan Registry",
+        description="Current professions and their members:",
+        color=discord.Color.blurple()
+    )
 
+    for profession, members in artisan_registry.items():
+        if members:  # only show professions with members
+            member_names = []
+            for uid, tier in members.items():
+                user = bot.get_user(int(uid))  # convert string back to int
+                if not user:
+                    try:
+                        user = await bot.fetch_user(int(uid))
+                    except:
+                        user = None
+                if user:
+                    member_names.append(f"• {user.display_name} ({tier})")
+                else:
+                    member_names.append(f"• Unknown ({uid}) ({tier})")
+            
+            icon = profession_icons.get(profession, "🎓")
+            embed.add_field(name=f"{icon} {profession}", value="\n".join(member_names), inline=False)
+    
+    if all(len(members) == 0 for members in artisan_registry.values()):
+        embed.description = "*No artisans have joined any profession yet.*"
+    
+    return embed
 
 
 
