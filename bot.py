@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 from enum import Enum
 import sqlite3
 import os
@@ -37,7 +38,7 @@ class Recipes(str, Enum):
     ELIXIR = "Mana Elixir"
 
 @bot.tree.command(name="learn_recipe", description="Learn a recipe")
-@commands.describe(recipe="Select a recipe to learn")
+@app_commands.describe(recipe="Select a recipe to learn")
 async def learn_recipe(interaction: discord.Interaction, recipe: Recipes):
     add_recipe(interaction.user.id, recipe.value)
     await interaction.response.send_message(f"✅ You learned **{recipe.value}**!")
