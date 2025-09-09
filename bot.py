@@ -15,6 +15,7 @@ intents.members = True # usefule for guild bots
 bot = commands.Bot(command_prefix="!", intents=intents)
 ADMIN_USER_IDS = [359521236663009293]  # Replace with your actual Discord user ID
 
+
 def init_db():
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
@@ -40,7 +41,7 @@ def init_db():
     conn.commit()
     conn.close()
 
-
+init_db()
 # Function to fetch recipes from Ashes Codex
 def fetch_recipes():
     url = "https://ashescodex.com/db/items/consumable/recipe/page/1?stats=&sortColumn=name&sortDir=asc"
@@ -146,6 +147,8 @@ class RecipeButton(discord.ui.Button):
 # Load JSON recipes
 with open("recipes.json", "r", encoding="utf-8") as f:
     recipes_data = json.load(f)
+if not recipes_data:
+    recipes_data = ["No recipes available"]  # fallback
 
 class RecipeSelect(discord.ui.Select):
     def __init__(self):
