@@ -31,7 +31,7 @@ def init_db():
 
 # Function to fetch recipes from Ashes Codex
 def fetch_recipes():
-    url = "https://ashesofcreation.wiki/Recipes"  # adjust to the correct codex page
+    url = "https://ashescodex.com/db/items/consumable/recipe/page/1?stats=&sortColumn=name&sortDir=asc"  # adjust to the correct codex page
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
 
@@ -47,10 +47,10 @@ def fetch_recipes():
 def add_recipes_to_db(recipes):
     conn = sqlite3.connect('recipes.db')
     c = conn.cursor()
-    for name, profession in recipes:
+    for name in recipes:
         c.execute(
             "INSERT INTO recipes (user_id, profession, recipe_name) VALUES (?, ?, ?)",
-            ('default_user', profession, name)
+            ('default_user', 'Unknown', name)
         )
     conn.commit()
     conn.close()
