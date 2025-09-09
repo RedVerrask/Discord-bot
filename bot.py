@@ -40,7 +40,6 @@ class RecipeChoices(commands.Transformer):
     
 @bot.tree.command(name="learn_recipe", description="Learn a recipe")
 @commands.describe(recipe="Select a recipe to learn")
-
 async def learn_recipe(interaction: discord.Interaction, recipe: RecipeChoices):
     add_recipe(interaction.user.id, recipe)
     await interaction.response.send_message(f"✅ You learned **{recipe}**!")
@@ -462,7 +461,7 @@ async def myrecipes(interaction: discord.Interaction):
 
 @bot.event
 async def on_ready():
-    GUILD_ID = 123456789012345678  # your server ID
+    GUILD_ID = 1064785222576644137  # your server ID
     guild = discord.Object(id=GUILD_ID)
     await bot.tree.sync(guild=guild)
 
