@@ -106,7 +106,7 @@ class RecipeView(discord.ui.View):
 
     @discord.ui.button(label="Learn Recipe", style=discord.ButtonStyle.success)
     async def add_recipe(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Please type your recipe:", view=AddRecipeView, ephemeral=True)
+        await interaction.response.send_message("Please type your recipe:", ephemeral=True)
 
     @discord.ui.button(label="List Recipes", style=discord.ButtonStyle.primary)
     async def list_recipes(self, interaction: discord.Interaction, button: discord.ui.Button):
