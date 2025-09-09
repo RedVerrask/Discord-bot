@@ -20,6 +20,7 @@ class Professions(commands.Cog):
         for profession, members in self.artisan_registry.items():
             member_list = []
             if not members:
+                icon = profession_icons.get(profession, "")
                 member_list.append("- Empty -")
             else:
                 for user_id, tier in members.items():
