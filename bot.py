@@ -27,7 +27,22 @@ def init_db():
     """)
     conn.commit()
     conn.close()
+ALL_RECIPES = ["Potion of Healing", "Iron Sword", "Mana Elixir"]  # example
 
+class RecipeChoices(commands.Transformer):
+    @classmethod
+    async def transform(cls, interaction, value):
+        if value in ALL_RECIPES:
+            return value
+        raise commands.TransformError(f"{value} is not a valid recipe")
+    
+@bot.tree.command(name="learn_recipe", description="Learn a recipe")
+@commands.describe(recipe="Select a recipe to learn")
+
+async def learn_recipe(interaction: discord.Interaction, recipe: RecipeChoices):
+    add_recipe(interaction.user.id, recipe)
+    await interaction.response.send_message(f"✅ You learned **{recipe}**!")
+    
 def add_recipe(user_id, profession, recipe_name):
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
@@ -427,17 +442,6 @@ async def home(interaction: discord.Interaction):
             "I couldn't DM you. Please enable DMs.", ephemeral=True
         )
 
-@bot.tree.command(name="learn_recipe", description="Learn a new recipe")
-async def learn_recipe(interaction: discord.Interaction, profession: str, recipe_name: str):
-    try:
-        print("✅ Slash command triggered!")
-        add_recipe(interaction.user.id, profession, recipe_name)
-        await interaction.response.send_message(
-            f"✅ {interaction.user.display_name} learned **{recipe_name}** as a {profession}!"
-        )
-    except Exception as e:
-        print(f"Error in learn_recipe: {e}")
-        await interaction.response.send_message("Something went wrong!", ephemeral=True)
 
 @bot.tree.command(name="myrecipes", description="View your learned recipes")
 async def myrecipes(interaction: discord.Interaction):
