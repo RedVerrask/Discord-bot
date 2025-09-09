@@ -73,6 +73,33 @@ artisan_registry = {
     "Weapon Smithing": [],
 }
 
+profession_icons = {
+    "Fishing": "🎣",
+    "Herbalism": "🌿",
+    "Hunting": "🏹",
+    "Lumberjacking": "🪓",
+    "Mining": "⛏️",
+
+    "Alchemy": "⚗️",
+    "Animal Husbandry": "🐄",
+    "Cooking": "🍳",
+    "Farming": "🌾",
+    "Lumber Milling": "🪵",
+    "Metalworking": "⚒️",
+    "Stonemasonry": "🧱",
+    "Tanning": "🪶",
+    "Weaving": "🧵",
+
+    "Arcane Engineering": "🔮",
+    "Armor Smithing": "🛡️",
+    "Carpentry": "🪑",
+    "Jewlry": "💍",
+    "Leatherworking": "👢",
+    "Scribing": "📜",
+    "Tailoring": "🧶",
+    "Weapon Smithing": "⚔️",
+}
+
 def set_user_profession(user_id: int, new_profession: str):
     # Remove user from any old profession
     for members in artisan_registry.values():
@@ -109,8 +136,9 @@ async def format_artisan_registry(bot: discord.Client):
                 else:
                     member_names.append(f"• Unknown ({uid})")
 
+            icon = profession_icons.get(profession, "🎓")  # fallback = 🎓
             embed.add_field(
-                name=f"🎓 {profession}",
+                name=f"{icon} {profession}",
                 value="\n".join(member_names),
                 inline=False
             )
