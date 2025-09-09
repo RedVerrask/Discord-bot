@@ -11,8 +11,37 @@ intents.members = True # usefule for guild bots
 bot = commands.Bot(command_prefix="!", intents=intents)
 ADMIN_USER_IDS = [359521236663009293]  # Replace with your actual Discord user ID
 
+with open("recipes.json", "r", encoding="utf-8") as f:
+    recipes = json.load(f)
 
+def init_db():
+    conn = sqlite3.connect("recipes.db")
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS recipes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            profession TEXT NOT NULL,
+            recipe_name TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
 
+def add_recipe(user_id, profession, recipe_name):
+    conn = sqlite3.connect("recipes.db")
+    c = conn.cursor()
+    c.execute("INSERT INTO recipes (user_id, profession, recipe_name) VALUES (?, ?, ?)", (user_id, profession, recipe_name))
+    conn.commit()
+    conn.close()
+
+def get_recipes_by_user(user_id):
+    conn = sqlite3.connect("recipes.db")
+    c = conn.cursor()
+    c.execute("SELECT profession, recipe_name FROM recipes WHERE user_id = ?", (user_id,))
+    results = c.fetchall()
+    conn.close()
+    return results
 
 class HomeView(discord.ui.View):
     def __init__(self):
@@ -28,26 +57,60 @@ class HomeView(discord.ui.View):
     async def recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("Recipe Menu:", view=RecipeView(), ephemeral=True)
 
-    
+class RecipeSelect(discord.ui.Select):
+    def __init__(self, profession):
+        # filter recipes by profession
+        options = [
+            discord.SelectOption(
+                label=recipe["name"],
+                description=f"Level {recipe['level']}"
+            )
+            for recipe in recipes if recipe["profession"] == profession
+        ][:25]  # discord limit: 25 options max
 
-    
+        super().__init__(placeholder="Select a recipe...", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        selected_recipe = self.values[0]
+        await interaction.response.send_message(
+            f"✅ You learned **{selected_recipe}**!", ephemeral=True
+        )
+        # TODO: save this to crafter's profile
+class AddRecipeView():
+    @bot.command()
+    async def learn(ctx, profession: str, *, recipe_name: str):
+        add_recipe(ctx.author.id, profession, recipe_name)
+        await ctx.send(f"✅ {ctx.author.display_name} learned **{recipe_name}** as a {profession}!")
+
+class AddListRecipes():
+    @bot.command()
+    async def myrecipes(ctx):
+        recipes = get_recipes_by_user(ctx.author.id)
+        if not recipes:
+            await ctx.send("You haven’t learned any recipes yet!")
+        else:
+            recipe_list = "\n".join([f"{prof}: {name}" for prof, name in recipes])
+            await ctx.send(f"📜 **Your Recipes:**\n{recipe_list}")
+
 
 class RecipeView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="Add Recipe", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="Learn Recipe", style=discord.ButtonStyle.success)
     async def add_recipe(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Please type your recipe:", ephemeral=True)
+        await interaction.response.send_message("Please type your recipe:", view=AddRecipeView, ephemeral=True)
 
     @discord.ui.button(label="List Recipes", style=discord.ButtonStyle.primary)
     async def list_recipes(self, interaction: discord.Interaction, button: discord.ui.Button):
         # For now, just a placeholder
         await interaction.response.send_message("Here are your recipes:\n- Example Recipe 1\n- Example Recipe 2", ephemeral=True)
 
-REGISTRY_FILE = "artisan_registry.json"
+#Professions
 
+REGISTRY_FILE = "artisan_registry.json"
 # Load registry from file if it exists
+
 def load_registry():
     if os.path.exists(REGISTRY_FILE):
         with open(REGISTRY_FILE, "r") as f:
