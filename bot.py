@@ -76,21 +76,21 @@ class RecipeSelect(discord.ui.Select):
             f"✅ You learned **{selected_recipe}**!", ephemeral=True
         )
         # TODO: save this to crafter's profile
-class AddRecipeView():
-    @bot.command()
-    async def learn(ctx, profession: str, *, recipe_name: str):
-        add_recipe(ctx.author.id, profession, recipe_name)
-        await ctx.send(f"✅ {ctx.author.display_name} learned **{recipe_name}** as a {profession}!")
 
-class AddListRecipes():
-    @bot.command()
-    async def myrecipes(ctx):
-        recipes = get_recipes_by_user(ctx.author.id)
-        if not recipes:
-            await ctx.send("You haven’t learned any recipes yet!")
-        else:
-            recipe_list = "\n".join([f"{prof}: {name}" for prof, name in recipes])
-            await ctx.send(f"📜 **Your Recipes:**\n{recipe_list}")
+@bot.command()
+async def learn(ctx, profession: str, *, recipe_name: str):
+    add_recipe(ctx.author.id, profession, recipe_name)
+    await ctx.send(f"✅ {ctx.author.display_name} learned **{recipe_name}** as a {profession}!")
+
+@bot.command()
+async def myrecipes(ctx):
+    recipes = get_recipes_by_user(ctx.author.id)
+    if not recipes:
+        await ctx.send("You haven’t learned any recipes yet!")
+    else:
+        recipe_list = "\n".join([f"{prof}: {name}" for prof, name in recipes])
+        await ctx.send(f"📜 **Your Recipes:**\n{recipe_list}")
+
 
 
 class RecipeView(discord.ui.View):
