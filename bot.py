@@ -13,13 +13,13 @@ intents.members = True # usefule for guild bots
 bot = commands.Bot(command_prefix="!", intents=intents)
 ADMIN_USER_IDS = [359521236663009293]  # Replace with your actual Discord user ID
 
-# Enum for predefined recipes
-class Recipes(str, Enum):
-    POTION = "Potion of Healing"
-    SWORD = "Iron Sword"
-    ELIXIR = "Mana Elixir"
 
-# Initialize SQLite DB
+
+# Load JSON recipes if needed
+with open("recipes.json", "r", encoding="utf-8") as f:
+    recipes_data = json.load(f)
+
+# ----- Database -----
 def init_db():
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
@@ -36,7 +36,6 @@ def init_db():
 
 init_db()
 
-# Add a recipe to DB
 def add_recipe(user_id, profession, recipe_name):
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
@@ -47,7 +46,6 @@ def add_recipe(user_id, profession, recipe_name):
     conn.commit()
     conn.close()
 
-# Get all recipes learned by a user
 def get_user_recipes(user_id):
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
@@ -56,25 +54,29 @@ def get_user_recipes(user_id):
     conn.close()
     return results
 
-# Button for each Enum recipe
+# ----- Enum for recipes -----
+class Recipes(str, Enum):
+    POTION = "Potion of Healing"
+    SWORD = "Iron Sword"
+    ELIXIR = "Mana Elixir"
+
+# ----- Buttons and Views -----
 class RecipeButton(discord.ui.Button):
     def __init__(self, recipe_name):
         super().__init__(label=recipe_name, style=discord.ButtonStyle.success)
         self.recipe_name = recipe_name
 
     async def callback(self, interaction: discord.Interaction):
-        profession = "Adventurer"  # Default profession
+        profession = "Adventurer"
         add_recipe(interaction.user.id, profession, self.recipe_name)
         await interaction.response.send_message(
             f"✅ You learned **{self.recipe_name}** as a {profession}!",
             ephemeral=True
         )
 
-# The view that holds all recipe buttons + list button
 class RecipeView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-        # Add a button for each recipe in the Enum
         for recipe in Recipes:
             self.add_item(RecipeButton(recipe.value))
 
@@ -88,11 +90,26 @@ class RecipeView(discord.ui.View):
         recipe_list = "\n".join([f"{prof}: {name}" for prof, name in user_recipes])
         await interaction.response.send_message(f"📜 Your Recipes:\n{recipe_list}", ephemeral=True)
 
-# Command to display the buttons
+class HomeView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Artisan", style=discord.ButtonStyle.secondary)
+    async def artisan_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Replace AddArtisanView with your actual view for artisan menus
+        await interaction.response.send_message("Artisan Menu:", ephemeral=True)
+
+    @discord.ui.button(label="Recipes", style=discord.ButtonStyle.primary)
+    async def recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("Recipe Menu:", view=RecipeView(), ephemeral=True)
+
+# ----- Commands -----
 @bot.command()
-async def recipes(ctx):
-    """Show the recipe menu with buttons"""
-    await ctx.send("Click a recipe to learn it or view your learned recipes:", view=RecipeView())
+async def recipes_menu(ctx):
+    """Show the main menu with buttons"""
+    await ctx.send("Welcome to your Guild Home:", view=HomeView())
+
+
 #Professions
 
 REGISTRY_FILE = "artisan_registry.json"
