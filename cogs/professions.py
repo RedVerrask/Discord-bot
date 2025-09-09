@@ -20,7 +20,6 @@ class Professions(commands.Cog):
         for profession, members in self.artisan_registry.items():
             member_list = []
             if not members:
-                icon = profession_icons.get(profession, "")
                 member_list.append("- Empty -")
             else:
                 for user_id, tier in members.items():
@@ -30,8 +29,8 @@ class Professions(commands.Cog):
                     except discord.NotFound:
                         member_list.append(f"Unknown User ({tier})")
         
-        icon = profession_icons.get(profession, "")
-        embed.add_field(name=f"{icon} {profession}", value="\n".join(member_list), inline=False)
+            icon = profession_icons.get(profession, "")
+            embed.add_field(name=f"{icon} {profession}", value="\n".join(member_list), inline=False)
 
         return embed
 
