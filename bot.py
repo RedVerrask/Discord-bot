@@ -42,6 +42,7 @@ def init_db():
     conn.close()
 
 init_db()
+
 # Function to fetch recipes from Ashes Codex
 def fetch_recipes():
     url = "https://ashescodex.com/db/items/consumable/recipe/page/1?stats=&sortColumn=name&sortDir=asc"
@@ -52,7 +53,8 @@ def fetch_recipes():
 
     with open("recipes.json", "w", encoding="utf-8") as f:
         json.dump(recipes, f, ensure_ascii=False, indent=2)
-
+    if not recipes_data:
+        recipes_data = ["Placeholder Recipe"]  # prevents crash
     return recipes
 
 
@@ -550,12 +552,19 @@ class ArtisanView(discord.ui.View):
 
 
 
-GUILD_ID = 1064785222576644137  # your server ID
+if __name__ == "__main__":
+    init_db()
 
-@bot.event
-async def on_ready():
-    
-    guild = discord.Object(id=GUILD_ID)
-    await bot.tree.sync(guild=guild)
-    print(f"Logged in as {bot.user} – commands synced!")
-bot.run(os.environ['DISCORD_TOKEN'])
+    # optional: scrape and seed DB once
+    # recipes = fetch_recipes()
+    # add_recipes_to_db(recipes)
+
+    GUILD_ID = 1064785222576644137  # your server ID
+
+    @bot.event
+    async def on_ready():
+        guild = discord.Object(id=GUILD_ID)
+        await bot.tree.sync(guild=guild)
+        print(f"Logged in as {bot.user} – commands synced!")
+
+    bot.run(os.environ['DISCORD_TOKEN'])  # only here
