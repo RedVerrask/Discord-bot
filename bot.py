@@ -3,7 +3,7 @@ from discord.ext import commands
 import sqlite3
 import os
 import asyncio  # make sure this is at the top of your file
-
+import json
 
 intents = discord.Intents.default()
 intents.message_content = True # Needed to read messages
@@ -45,33 +45,49 @@ class RecipeView(discord.ui.View):
         # For now, just a placeholder
         await interaction.response.send_message("Here are your recipes:\n- Example Recipe 1\n- Example Recipe 2", ephemeral=True)
 
+REGISTRY_FILE = "artisan_registry.json"
 
-artisan_registry = {
-    "Fishing": [],
-    "Herbalism": [],
-    "Hunting": [],
-    "Lumberjacking": [],
-    "Mining": [],
-    
-    "Alchemy": [],
-    "Animal Husbandry": [],
-    "Cooking": [],
-    "Farming": [],
-    "Lumber Milling": [],
-    "Metalworking": [],
-    "Stonemasonry": [],
-    "Tanning": [],
-    "Weaving": [],
+# Load registry from file if it exists
+def load_registry():
+    if os.path.exists(REGISTRY_FILE):
+        with open(REGISTRY_FILE, "r") as f:
+            return json.load(f)
+    else:
+        # default empty registry
+        return {
+            "Fishing": [],
+            "Herbalism": [],
+            "Hunting": [],
+            "Lumberjacking": [],
+            "Mining": [],
+            
+            "Alchemy": [],
+            "Animal Husbandry": [],
+            "Cooking": [],
+            "Farming": [],
+            "Lumber Milling": [],
+            "Metalworking": [],
+            "Stonemasonry": [],
+            "Tanning": [],
+            "Weaving": [],
+            
+            "Arcane Engineering": [],
+            "Armor Smithing": [],
+            "Carpentry": [],
+            "Jewelry": [],
+            "Leatherworking": [],
+            "Scribing": [],
+            "Tailoring": [],
+            "Weapon Smithing": [],
+        }
 
-    "Arcane Engineering": [],
-    "Armor Smithing": [],
-    "Carpentry": [],
-    "Jewlry": [],
-    "Leatherworking": [],
-    "Scribing": [],
-    "Tailoring": [],
-    "Weapon Smithing": [],
-}
+def save_registry():
+    with open(REGISTRY_FILE, "w") as f:
+        json.dump(artisan_registry, f, indent=4)
+
+
+artisan_registry = load_registry()
+
 
 profession_icons = {
     "Fishing": "🎣",
@@ -112,6 +128,9 @@ def set_user_profession(user_id: int, new_profession: str):
 
     # Add to new profession
     artisan_registry[new_profession].append(user_id)
+
+    # Save changes
+    save_registry()
 
 async def format_artisan_registry(bot: discord.Client):
     embed = discord.Embed(
