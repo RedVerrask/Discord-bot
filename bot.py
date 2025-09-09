@@ -133,6 +133,28 @@ def set_user_profession(user_id: int, new_profession: str, tier: str):
     # Save changes
     save_registry()
 
+class TierSelect(discord.ui.Select):
+    def __init__(self, user_id: int, profession: str):
+        self.user_id = user_id
+        self.profession = profession
+
+        options = [
+            discord.SelectOption(label="Novice", description="Just starting out"),
+            discord.SelectOption(label="Apprentice", description="Learning the ropes"),
+            discord.SelectOption(label="Journeyman", description="Skilled worker"),
+            discord.SelectOption(label="Master", description="Expert level"),
+            discord.SelectOption(label="Grandmaster", description="The very best"),
+        ]
+
+        super().__init__(placeholder="Choose your tier...", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        tier = self.values[0]
+        set_user_profession(self.user_id, self.profession, tier)
+        await interaction.response.send_message(
+            f"You are now a **{tier} {self.profession}**!", ephemeral=True
+        )
+
 class TierSelectView(discord.ui.View):
     def __init__(self, user_id, profession):
         super().__init__(timeout=None)
@@ -159,50 +181,6 @@ class TierSelectView(discord.ui.View):
         )
 
 
-class TierSelectView(discord.ui.View):
-    def __init__(self, user_id: int, profession: str):
-        super().__init__(timeout=60)
-        self.add_item(TierSelect(user_id, profession))
-
-
-async def format_artisan_registry(bot: discord.Client):
-    embed = discord.Embed(
-        title="⚒️ Artisan Registry",
-        description="Here’s the current list of professions and their members:",
-        color=discord.Color.blurple()
-    )
-
-    for profession, members in artisan_registry.items():
-        if members:  # only add if profession has members
-            member_names = []
-            for uid, tier in members.items():
-                user = bot.get_user(uid)
-                if not user:  # if not cached, fetch from API
-                    try:
-                        user = await bot.fetch_user(uid)
-                    except:
-                        user = None
-
-                if user:
-                    member_names.append(f"• {user.display_name} ({tier})")
-                else:
-                    member_names.append(f"• Unknown ({uid}) ({tier})")
-
-            # Add one field per profession
-            icon = profession_icons.get(profession, "🎓")  # fallback if no icon
-            embed.add_field(
-                name=f"{icon} {profession}",
-                value="\n".join(member_names),
-                inline=False
-            )
-
-
-    # If literally no members anywhere
-    if all(len(members) == 0 for members in artisan_registry.values()):
-        embed.description = "*No artisans have joined any profession yet.*"
-
-    return embed
-
 
 class AddGathererView(discord.ui.View):
     @discord.ui.button(label="Mining", style=discord.ButtonStyle.secondary)
@@ -212,7 +190,7 @@ class AddGathererView(discord.ui.View):
             "Select your Mining tier:",
             view=TierSelectView(user_id, "Mining"),
             ephemeral=True
-        )
+    )
 
     
     
