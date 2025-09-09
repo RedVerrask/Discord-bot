@@ -77,18 +77,54 @@ class RecipeButton(discord.ui.Button):
 class RecipeView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-        for recipe in Recipes:
-            self.add_item(RecipeButton(recipe.value))
+
+    @discord.ui.button(label="Learn Recipe", style=discord.ButtonStyle.success)
+    async def learn_recipe_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Prompt the user to type a recipe they want to learn
+        await interaction.response.send_message(
+            "Type the name of the recipe you want to learn:", ephemeral=True
+        )
+
+        # Wait for the user's next message
+        def check(m):
+            return m.author == interaction.user and m.channel == interaction.channel
+
+        try:
+            msg = await interaction.client.wait_for("message", check=check, timeout=60)
+            recipe_name = msg.content.strip()
+
+            # Optionally, check if the recipe is valid
+            if recipe_name not in [r.value for r in Recipes]:
+                await interaction.followup.send(
+                    f"❌ `{recipe_name}` is not a valid recipe.", ephemeral=True
+                )
+                return
+
+            # Save to DB
+            profession = "Adventurer"  # default profession for now
+            add_recipe(interaction.user.id, profession, recipe_name)
+
+            await interaction.followup.send(
+                f"✅ You learned **{recipe_name}** as a {profession}!", ephemeral=True
+            )
+        except asyncio.TimeoutError:
+            await interaction.followup.send(
+                "⌛ You took too long to respond. Try clicking the button again.", ephemeral=True
+            )
 
     @discord.ui.button(label="List Recipes", style=discord.ButtonStyle.primary)
     async def list_recipes(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_recipes = get_user_recipes(interaction.user.id)
         if not user_recipes:
-            await interaction.response.send_message("You haven’t learned any recipes yet!", ephemeral=True)
+            await interaction.response.send_message(
+                "You haven’t learned any recipes yet!", ephemeral=True
+            )
             return
 
         recipe_list = "\n".join([f"{prof}: {name}" for prof, name in user_recipes])
-        await interaction.response.send_message(f"📜 Your Recipes:\n{recipe_list}", ephemeral=True)
+        await interaction.response.send_message(
+            f"📜 Your Recipes:\n{recipe_list}", ephemeral=True
+        )
 
 @bot.tree.command(name="home", description="Open your guild home menu")
 async def home(interaction: discord.Interaction):
