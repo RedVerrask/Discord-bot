@@ -136,12 +136,6 @@ def set_user_profession(user_id: int, new_profession: str, tier: str):
 
 
 
-def set_user_profession(user_id, profession, tier):
-    # update your data structure here
-    # example: user_professions[user_id] = {"profession": profession, "tier": tier}
-    print(f"Saved: {user_id} -> {tier} {profession}")
-
-
 class TierSelectView(discord.ui.View):
     def __init__(self, user_id, profession):
         super().__init__(timeout=None)
