@@ -3,6 +3,8 @@ from discord.ext import commands
 from discord import app_commands
 from enum import Enum
 import sqlite3
+import requests
+from bs4 import BeautifulSoup
 import os
 import asyncio  # make sure this is at the top of your file
 import json
@@ -15,26 +17,34 @@ ADMIN_USER_IDS = [359521236663009293]  # Replace with your actual Discord user I
 
 
 
-# Load JSON recipes if needed
-with open("recipes.json", "r", encoding="utf-8") as f:
-    recipes_data = json.load(f)
+# Function to fetch recipes from Ashes Codex
+def fetch_recipes():
+    url = 'https://ashescodex.com/db/items/consumable/recipe/page/1'
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
 
-# ----- Database -----
-def init_db():
-    conn = sqlite3.connect("recipes.db")
+    recipes = []
+    for item in soup.find_all('div', class_='item'):
+        name = item.find('span', class_='name').text.strip()
+        profession = item.find('span', class_='profession').text.strip()
+        recipes.append((name, profession))
+    return recipes
+
+# Function to add recipes to the database
+def add_recipes_to_db(recipes):
+    conn = sqlite3.connect('recipes.db')
     c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS recipes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL,
-            profession TEXT NOT NULL,
-            recipe_name TEXT NOT NULL
+    for name, profession in recipes:
+        c.execute(
+            "INSERT INTO recipes (user_id, profession, recipe_name) VALUES (?, ?, ?)",
+            ('default_user', profession, name)
         )
-    """)
     conn.commit()
     conn.close()
 
-init_db()
+# Fetch and add recipes
+recipes = fetch_recipes()
+add_recipes_to_db(recipes)
 
 def add_recipe(user_id, profession, recipe_name):
     conn = sqlite3.connect("recipes.db")
