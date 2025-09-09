@@ -3,7 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 from enum import Enum
 import sqlite3
-import requests
+import requests 
 from bs4 import BeautifulSoup
 import os
 import asyncio  # make sure this is at the top of your file
