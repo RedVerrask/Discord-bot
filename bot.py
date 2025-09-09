@@ -30,6 +30,8 @@ class HomeView(discord.ui.View):
 
     
 
+    
+
 class RecipeView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -84,6 +86,39 @@ def set_user_profession(user_id: int, new_profession: str):
     # Add to new profession
     artisan_registry[new_profession].append(user_id)
 
+async def format_artisan_registry(bot: discord.Client):
+    embed = discord.Embed(
+        title="Current Artisan Registry",
+        description="Here’s a list of professions and their members:",
+        color=discord.Color.green()
+    )
+
+    for profession, members in artisan_registry.items():
+        if members:
+            # Convert user IDs -> usernames
+            member_names = []
+            for uid in members:
+                user = bot.get_user(uid)  # Try to fetch cached user
+                if not user:
+                    try:
+                        user = await bot.fetch_user(uid)  # Fetch from API if not cached
+                    except:
+                        user = None
+                member_names.append(user.name if user else f"Unknown ({uid})")
+
+            embed.add_field(
+                name=profession,
+                value=", ".join(member_names),
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name=profession,
+                value="*No members yet*",
+                inline=False
+            )
+
+    return embed
 
 
 class AddGathererView(discord.ui.View):
@@ -94,6 +129,7 @@ class AddGathererView(discord.ui.View):
         #Add user to profession if not already added
         await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
+    
     
     @discord.ui.button(label="Lumberjacking", style=discord.ButtonStyle.secondary)
     async def add_LumberJacking(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -271,9 +307,16 @@ class AddArtisanView(discord.ui.View):
     async def add_CraftingProfession(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(" Crafting: ", view=AddCraftingProfessionView(), ephemeral=True)
 
+    @discord.ui.button(label="View Current Professions", style=discord.ButtonStyle.secondary)
+    async def view_artisans(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = await format_artisan_registry(interaction.client)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        
+    
+
     @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary)
     async def add_Back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("back?", view=HomeView(), ephemeral=True)
+        await interaction.response.send_message("what can I do for ya Scrub?", view=HomeView(), ephemeral=True)
         
 
 class ArtisanView(discord.ui.View):
