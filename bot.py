@@ -141,7 +141,8 @@ class HomeView(discord.ui.View):
 
     @discord.ui.button(label="Recipes", style=discord.ButtonStyle.primary)
     async def recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Recipe Menu:", view=RecipeSelectView(), ephemeral=True)
+        # Send the menu with "Learn Recipe" and "View My Recipes"
+        await interaction.response.send_message("Recipe Menu:", view=RecipeMenuView(), ephemeral=True)
 
 # ----- Commands -----
 @bot.command()
