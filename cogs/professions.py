@@ -4,6 +4,28 @@ import os
 import json
 
 class Professions(commands.Cog):
+    # ... your other methods ...
+
+    async def format_artisan_registry(self, bot: commands.Bot) -> discord.Embed:
+        """Return an embed showing all users and their professions."""
+        embed = discord.Embed(title="Current Professions", color=discord.Color.blurple())
+
+        for profession, members in self.artisan_registry.items():
+            if not members:
+                continue
+            member_list = []
+            for user_id, tier in members.items():
+                try:
+                    user = await bot.fetch_user(int(user_id))
+                    member_list.append(f"{user.name} ({tier})")
+                except discord.NotFound:
+                    member_list.append(f"Unknown User ({tier})")
+            embed.add_field(name=profession, value="\n".join(member_list), inline=False)
+
+        return embed
+
+
+
     def __init__(self, bot):
         self.bot = bot
         self.REGISTRY_FILE = "artisan_registry.json"
