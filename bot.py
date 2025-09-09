@@ -16,6 +16,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 ADMIN_USER_IDS = [359521236663009293]  # Replace with your actual Discord user ID
 
 
+
 def init_db():
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
@@ -45,21 +46,33 @@ init_db()
 
 # Function to fetch recipes from Ashes Codex
 def fetch_recipes():
-    url = "https://ashescodex.com/db/items/consumable/recipe/page/1?stats=&sortColumn=name&sortDir=asc"
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, "html.parser")
+    base_url = "https://ashescodex.com/db/items/consumable/recipe/page/{}?stats=&sortColumn=name&sortDir=asc"
+    recipes = []
+    page = 1
 
-    recipes = [item.text.strip() for item in soup.select("li a") if item.text.strip()]
+    while True:
+        url = base_url.format(page)
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        page_recipes = [item.text.strip() for item in soup.select("li a") if item.text.strip()]
+        if not page_recipes:
+            break  # no more recipes, exit the loop
+
+        recipes.extend(page_recipes)
+        page += 1
+
+    if not recipes:
+        recipes = ["Placeholder Recipe"]  # prevents crash if nothing is scraped
 
     with open("recipes.json", "w", encoding="utf-8") as f:
         json.dump(recipes, f, ensure_ascii=False, indent=2)
-    if not recipes:
-        recipes = ["Placeholder Recipe"]  # prevents crash
 
-    with open("recipes.json", "r", encoding="utf-8") as f:
-        json.dump(recipes, f, ensure_ascii=False, indent=2)
     return recipes
 
+if __name__ == "__main__":
+    all_recipes = fetch_recipes()
+    print(f"Fetched {len(all_recipes)} recipes!")
 
 def add_recipes_to_db(recipes):
     conn = sqlite3.connect("recipes.db")
