@@ -155,9 +155,9 @@ class RecipeSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         recipe_name = self.values[0]
         profession = "Adventurer"
-        add_recipe_for_user(interaction.user.id, profession, recipe_name)
+        add_recipe_for_user(interaction.user.id, recipe_name)
         await interaction.response.send_message(
-            f"✅ You learned **{recipe_name}** as a {profession}!",
+            f"✅ You learned **{recipe_name}**!",
             ephemeral=True
         )
 
