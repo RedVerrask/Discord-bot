@@ -461,11 +461,11 @@ async def myrecipes(interaction: discord.Interaction):
         )
 
 
-
+GUILD_ID = 1064785222576644137  # your server ID
 
 @bot.event
 async def on_ready():
-    GUILD_ID = 1064785222576644137  # your server ID
+    
     guild = discord.Object(id=GUILD_ID)
     await bot.tree.sync(guild=guild)
     print(f"Logged in as {bot.user} – commands synced!")
