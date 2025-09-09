@@ -105,18 +105,7 @@ def get_user_recipes(user_id):
     conn.close()
     return results
 
-def add_recipe(user_id, profession, recipe_name):
-    conn = sqlite3.connect("recipes.db")
-    c = conn.cursor()
 
-    # Ensure table exists
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS user_recipes (
-            user_id TEXT,
-            profession TEXT,
-            recipe_name TEXT
-        )
-    """)
 
     # Check if recipe already exists
     c.execute("""
@@ -147,7 +136,7 @@ class RecipeButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         profession = "Adventurer"
-        add_recipe(interaction.user.id, profession, self.recipe_name)
+        add_recipe_for_user(interaction.user.id, profession, self.recipe_name)
         await interaction.response.send_message(
             f"✅ You learned **{self.recipe_name}** as a {profession}!",
             ephemeral=True
@@ -166,7 +155,7 @@ class RecipeSelect(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         recipe_name = self.values[0]
         profession = "Adventurer"
-        add_recipe(interaction.user.id, profession, recipe_name)
+        add_recipe_for_user(interaction.user.id, profession, recipe_name)
         await interaction.response.send_message(
             f"✅ You learned **{recipe_name}** as a {profession}!",
             ephemeral=True
