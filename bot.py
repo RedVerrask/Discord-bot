@@ -53,33 +53,34 @@ def load_registry():
         with open(REGISTRY_FILE, "r") as f:
             return json.load(f)
     else:
-        # default empty registry
+        # default empty registry with dicts, not lists
         return {
-            "Fishing": [],
-            "Herbalism": [],
-            "Hunting": [],
-            "Lumberjacking": [],
-            "Mining": [],
+            "Fishing": {},
+            "Herbalism": {},
+            "Hunting": {},
+            "Lumberjacking": {},
+            "Mining": {},
             
-            "Alchemy": [],
-            "Animal Husbandry": [],
-            "Cooking": [],
-            "Farming": [],
-            "Lumber Milling": [],
-            "Metalworking": [],
-            "Stonemasonry": [],
-            "Tanning": [],
-            "Weaving": [],
+            "Alchemy": {},
+            "Animal Husbandry": {},
+            "Cooking": {},
+            "Farming": {},
+            "Lumber Milling": {},
+            "Metalworking": {},
+            "Stonemasonry": {},
+            "Tanning": {},
+            "Weaving": {},
             
-            "Arcane Engineering": [],
-            "Armor Smithing": [],
-            "Carpentry": [],
-            "Jewelry": [],
-            "Leatherworking": [],
-            "Scribing": [],
-            "Tailoring": [],
-            "Weapon Smithing": [],
+            "Arcane Engineering": {},
+            "Armor Smithing": {},
+            "Carpentry": {},
+            "Jewelry": {},
+            "Leatherworking": {},
+            "Scribing": {},
+            "Tailoring": {},
+            "Weapon Smithing": {},
         }
+
 
 def save_registry():
     with open(REGISTRY_FILE, "w") as f:
@@ -118,20 +119,20 @@ profession_icons = {
 
 def set_user_profession(user_id: int, new_profession: str, tier: str):
     # Remove user from any old profession
-    for members in artisan_registry.values():
-        if user_id in members:
-            members.remove(user_id)
+    for profession, members in artisan_registry.items():
+        if str(user_id) in members:  # JSON saves keys as strings
+            del members[str(user_id)]
 
     # Make sure the profession exists
     if new_profession not in artisan_registry:
-        artisan_registry[new_profession] = []
+        artisan_registry[new_profession] = {}
 
-    # Add to new profession
-    artisan_registry[new_profession][user_id] = tier
-    artisan_registry[new_profession].append(user_id)
+    # Add to new profession with tier
+    artisan_registry[new_profession][str(user_id)] = tier
 
     # Save changes
     save_registry()
+
 
 
 
