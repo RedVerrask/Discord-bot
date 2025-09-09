@@ -74,57 +74,25 @@ class RecipeButton(discord.ui.Button):
             ephemeral=True
         )
 
-class RecipeView(discord.ui.View):
+        return
+class RecipeSelect(discord.ui.Select):
+    def __init__(self):
+        options = [discord.SelectOption(label=recipe.value) for recipe in Recipes]
+        super().__init__(placeholder="Select a recipe...", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        recipe_name = self.values[0]
+        profession = "Adventurer"
+        add_recipe(interaction.user.id, profession, recipe_name)
+        await interaction.response.send_message(
+            f"✅ You learned **{recipe_name}** as a {profession}!",
+            ephemeral=True
+        )
+
+class RecipeSelectView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-
-    @discord.ui.button(label="Learn Recipe", style=discord.ButtonStyle.success)
-    async def learn_recipe_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Prompt the user to type a recipe they want to learn
-        await interaction.response.send_message(
-            "Type the name of the recipe you want to learn:", ephemeral=True
-        )
-
-        # Wait for the user's next message
-        def check(m):
-            return m.author == interaction.user and m.channel == interaction.channel
-
-        try:
-            msg = await interaction.client.wait_for("message", check=check, timeout=60)
-            recipe_name = msg.content.strip()
-
-            # Optionally, check if the recipe is valid
-            if recipe_name not in [r.value for r in Recipes]:
-                await interaction.followup.send(
-                    f"❌ `{recipe_name}` is not a valid recipe.", ephemeral=True
-                )
-                return
-
-            # Save to DB
-            profession = "Adventurer"  # default profession for now
-            add_recipe(interaction.user.id, profession, recipe_name)
-
-            await interaction.followup.send(
-                f"✅ You learned **{recipe_name}** as a {profession}!", ephemeral=True
-            )
-        except asyncio.TimeoutError:
-            await interaction.followup.send(
-                "⌛ You took too long to respond. Try clicking the button again.", ephemeral=True
-            )
-
-    @discord.ui.button(label="List Recipes", style=discord.ButtonStyle.primary)
-    async def list_recipes(self, interaction: discord.Interaction, button: discord.ui.Button):
-        user_recipes = get_user_recipes(interaction.user.id)
-        if not user_recipes:
-            await interaction.response.send_message(
-                "You haven’t learned any recipes yet!", ephemeral=True
-            )
-            return
-
-        recipe_list = "\n".join([f"{prof}: {name}" for prof, name in user_recipes])
-        await interaction.response.send_message(
-            f"📜 Your Recipes:\n{recipe_list}", ephemeral=True
-        )
+        self.add_item(RecipeSelect())
 
 @bot.tree.command(name="home", description="Open your guild home menu")
 async def home(interaction: discord.Interaction):
@@ -154,7 +122,7 @@ class HomeView(discord.ui.View):
 
     @discord.ui.button(label="Recipes", style=discord.ButtonStyle.primary)
     async def recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Recipe Menu:", view=RecipeView(), ephemeral=True)
+        await interaction.response.send_message("Recipe Menu:", view=RecipeSelectView(), ephemeral=True)
 
 # ----- Commands -----
 @bot.command()
@@ -482,19 +450,9 @@ class ArtisanView(discord.ui.View):
 
 
 
-@bot.command()
-async def learn(ctx):
-    await ctx.send("Click a recipe to learn it:", view=RecipeView())
 
 # Command to view learned recipes
-@bot.command()
-async def myrecipes(ctx):
-    recipes = get_user_recipes(ctx.author.id)
-    if not recipes:
-        await ctx.send("You haven’t learned any recipes yet!")
-    else:
-        recipe_list = "\n".join([f"{prof}: {name}" for prof, name in recipes])
-        await ctx.send(f"📜 Your Recipes:\n{recipe_list}")
+
 
 
 GUILD_ID = 1064785222576644137  # your server ID
