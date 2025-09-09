@@ -90,6 +90,23 @@ class RecipeView(discord.ui.View):
         recipe_list = "\n".join([f"{prof}: {name}" for prof, name in user_recipes])
         await interaction.response.send_message(f"📜 Your Recipes:\n{recipe_list}", ephemeral=True)
 
+@bot.tree.command(name="home", description="Open your guild home menu")
+async def home(interaction: discord.Interaction):
+    try:
+        # DM the user first
+        dm_channel = await interaction.user.create_dm()
+        await dm_channel.send("Welcome to your Guild Home!", view=HomeView())
+
+        # Respond to the slash command so Discord doesn’t timeout
+        await interaction.response.send_message(
+            "I've sent you a DM with your home menu!", ephemeral=True
+        )
+
+    except discord.Forbidden:
+        await interaction.response.send_message(
+            "I couldn't DM you. Please enable DMs.", ephemeral=True
+        )
+
 class HomeView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -426,22 +443,7 @@ class ArtisanView(discord.ui.View):
     async def view_artisans(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("You chose to View artisans!", ephemeral=True)
 
-@bot.tree.command(name="home", description="Open your guild home menu")
-async def home(interaction: discord.Interaction):
-    try:
-        # DM the user first
-        dm_channel = await interaction.user.create_dm()
-        await dm_channel.send("Welcome to your Guild Home!", view=HomeView())
 
-        # Respond to the slash command so Discord doesn’t timeout
-        await interaction.response.send_message(
-            "I've sent you a DM with your home menu!", ephemeral=True
-        )
-
-    except discord.Forbidden:
-        await interaction.response.send_message(
-            "I couldn't DM you. Please enable DMs.", ephemeral=True
-        )
 
 
 @bot.command()
