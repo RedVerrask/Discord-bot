@@ -57,16 +57,17 @@ def fetch_recipes():
 
         page_recipes = [item.text.strip() for item in soup.select("li a") if item.text.strip()]
         if not page_recipes:
-            break  # no more recipes, exit the loop
+            break
 
         recipes.extend(page_recipes)
         page += 1
 
-    if os.path.exists("recipes.json"):
-        with open("recipes.json", "r", encoding="utf-8") as f:
-            recipes_data = json.load(f)
-    else:
-        recipes_data = ["No recipes available"]
+    # ✅ Save recipes to file after scraping
+    with open("recipes.json", "w", encoding="utf-8") as f:
+        json.dump(recipes, f, ensure_ascii=False, indent=2)
+
+    return recipes
+
 
 
 
@@ -80,6 +81,8 @@ def add_recipes_to_db(recipes):
         )
     conn.commit()
     conn.close()
+
+
 
 # Fetch and add recipes
 def add_recipe_for_user(user_id, recipe_name):
@@ -548,11 +551,11 @@ if __name__ == "__main__":
     init_db()
     all_recipes = fetch_recipes()
     print(f"Fetched {len(all_recipes)} recipes!")
-    # optional: scrape and seed DB once
-    # recipes = fetch_recipes()
-    # add_recipes_to_db(recipes)
 
-    GUILD_ID = 1064785222576644137  # your server ID
+    # seed the DB with fetched recipes
+    add_recipes_to_db(all_recipes)
+
+    GUILD_ID = 1064785222576644137
 
     @bot.event
     async def on_ready():
@@ -560,4 +563,4 @@ if __name__ == "__main__":
         await bot.tree.sync(guild=guild)
         print(f"Logged in as {bot.user} – commands synced!")
 
-    bot.run(os.environ['DISCORD_TOKEN'])  # only here
+    bot.run(os.environ['DISCORD_TOKEN'])
