@@ -79,10 +79,10 @@ class RecipeSelect(discord.ui.Select):
 
 @bot.tree.command(name="learn_recipe", description="Learn a new recipe")
 async def learn(interaction: discord.Interaction, profession: str, recipe_name: str):
+    print("✅ Slash command triggered!")  # Debug
     add_recipe(interaction.user.id, profession, recipe_name)
     await interaction.response.send_message(
-        f"✅ {interaction.user.display_name} learned **{recipe_name}** as a {profession}!",
-        ephemeral=True
+        f"✅ {interaction.user.display_name} learned **{recipe_name}** as a {profession}!"
     )
 
 
