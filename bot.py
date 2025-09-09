@@ -118,7 +118,7 @@ class HomeView(discord.ui.View):
     @discord.ui.button(label="Artisan", style=discord.ButtonStyle.secondary)
     async def artisan_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         # Replace AddArtisanView with your actual view for artisan menus
-        await interaction.response.send_message("Artisan Menu:", ephemeral=True)
+        await interaction.response.send_message("Artisan Menu:", view=AddArtisanView, ephemeral=True)
 
     @discord.ui.button(label="Recipes", style=discord.ButtonStyle.primary)
     async def recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
