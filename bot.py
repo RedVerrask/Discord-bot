@@ -77,12 +77,13 @@ class RecipeSelect(discord.ui.Select):
         )
         # TODO: save this to crafter's profile
 
-@bot.command()
+@bot.tree.command(name="Learn a recipe", description="Which Recipe?")
 async def learn(ctx, profession: str, *, recipe_name: str):
     add_recipe(ctx.author.id, profession, recipe_name)
     await ctx.send(f"✅ {ctx.author.display_name} learned **{recipe_name}** as a {profession}!")
 
-@bot.command()
+
+@bot.tree.command()
 async def myrecipes(ctx):
     recipes = get_recipes_by_user(ctx.author.id)
     if not recipes:
