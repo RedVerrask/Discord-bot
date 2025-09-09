@@ -18,24 +18,35 @@ ADMIN_USER_IDS = [359521236663009293]  # Replace with your actual Discord user I
 def init_db():
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
+
+    # Master recipe list
     c.execute("""
-        CREATE TABLE IF NOT EXISTS recipes (
+        CREATE TABLE IF NOT EXISTS all_recipes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            profession TEXT NOT NULL,
+            recipe_name TEXT NOT NULL UNIQUE
+        )
+    """)
+
+    # User-learned recipes
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS user_recipes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
-            profession TEXT NOT NULL,
-            recipe_name TEXT NOT NULL
+            recipe_id INTEGER NOT NULL,
+            FOREIGN KEY(recipe_id) REFERENCES all_recipes(id)
         )
     """)
     conn.commit()
     conn.close()
 
+
 # Function to fetch recipes from Ashes Codex
 def fetch_recipes():
-    url = "https://ashescodex.com/db/items/consumable/recipe/page/1?stats=&sortColumn=name&sortDir=asc"  # adjust to the correct codex page
+    url = "https://ashescodex.com/db/items/consumable/recipe/page/1?stats=&sortColumn=name&sortDir=asc"
     response = requests.get(url)
     soup = BeautifulSoup(response.text, "html.parser")
 
-    # Example: get all recipe names from <li> or <a> tags (depends on site structure)
     recipes = [item.text.strip() for item in soup.select("li a") if item.text.strip()]
 
     with open("recipes.json", "w", encoding="utf-8") as f:
@@ -43,21 +54,54 @@ def fetch_recipes():
 
     return recipes
 
-# Function to add recipes to the database
+
 def add_recipes_to_db(recipes):
-    conn = sqlite3.connect('recipes.db')
+    conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
     for name in recipes:
         c.execute(
-            "INSERT INTO recipes (user_id, profession, recipe_name) VALUES (?, ?, ?)",
-            ('default_user', 'Unknown', name)
+            "INSERT OR IGNORE INTO all_recipes (profession, recipe_name) VALUES (?, ?)",
+            ("Unknown", name)
         )
     conn.commit()
     conn.close()
 
 # Fetch and add recipes
-recipes = fetch_recipes()
-add_recipes_to_db(recipes)
+def add_recipe_for_user(user_id, recipe_name):
+    conn = sqlite3.connect("recipes.db")
+    c = conn.cursor()
+
+    # Get recipe_id from master list
+    c.execute("SELECT id FROM all_recipes WHERE recipe_name = ?", (recipe_name,))
+    result = c.fetchone()
+    if not result:
+        conn.close()
+        return False  # recipe doesn’t exist in master list
+
+    recipe_id = result[0]
+
+    # Insert into user_recipes
+    c.execute(
+        "INSERT INTO user_recipes (user_id, recipe_id) VALUES (?, ?)",
+        (str(user_id), recipe_id)
+    )
+    conn.commit()
+    conn.close()
+    return True
+
+
+def get_user_recipes(user_id):
+    conn = sqlite3.connect("recipes.db")
+    c = conn.cursor()
+    c.execute("""
+        SELECT all_recipes.profession, all_recipes.recipe_name
+        FROM user_recipes
+        JOIN all_recipes ON user_recipes.recipe_id = all_recipes.id
+        WHERE user_recipes.user_id = ?
+    """, (str(user_id),))
+    results = c.fetchall()
+    conn.close()
+    return results
 
 def add_recipe(user_id, profession, recipe_name):
     conn = sqlite3.connect("recipes.db")
@@ -68,20 +112,6 @@ def add_recipe(user_id, profession, recipe_name):
     )
     conn.commit()
     conn.close()
-
-def get_user_recipes(user_id):
-    conn = sqlite3.connect("recipes.db")
-    c = conn.cursor()
-    c.execute("SELECT profession, recipe_name FROM recipes WHERE user_id = ?", (str(user_id),))
-    results = c.fetchall()
-    conn.close()
-    return results
-
-# ----- Enum for recipes -----
-class Recipes(str, Enum):
-    POTION = "Potion of Healing"
-    SWORD = "Iron Sword"
-    ELIXIR = "Mana Elixir"
 
 # ----- Buttons and Views -----
 class RecipeButton(discord.ui.Button):
