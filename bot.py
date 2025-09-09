@@ -426,14 +426,18 @@ async def home(interaction: discord.Interaction):
         await interaction.response.send_message(
             "I couldn't DM you. Please enable DMs.", ephemeral=True
         )
-        
+
 @bot.tree.command(name="learn_recipe", description="Learn a new recipe")
-async def learn(interaction: discord.Interaction, profession: str, recipe_name: str):
-    print("✅ Slash command triggered!")  # Debug
-    add_recipe(interaction.user.id, profession, recipe_name)
-    await interaction.response.send_message(
-        f"✅ {interaction.user.display_name} learned **{recipe_name}** as a {profession}!"
-    )
+async def learn_recipe(interaction: discord.Interaction, profession: str, recipe_name: str):
+    try:
+        print("✅ Slash command triggered!")
+        add_recipe(interaction.user.id, profession, recipe_name)
+        await interaction.response.send_message(
+            f"✅ {interaction.user.display_name} learned **{recipe_name}** as a {profession}!"
+        )
+    except Exception as e:
+        print(f"Error in learn_recipe: {e}")
+        await interaction.response.send_message("Something went wrong!", ephemeral=True)
 
 @bot.tree.command(name="myrecipes", description="View your learned recipes")
 async def myrecipes(interaction: discord.Interaction):
