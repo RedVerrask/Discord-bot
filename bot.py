@@ -142,23 +142,37 @@ class TierSelectView(discord.ui.View):
         self.user_id = user_id
         self.profession = profession
 
+        self.add_item(discord.ui.Select(
+            placeholder="Choose your tier...",
+            options=[
+                discord.SelectOption(label="Novice", description="Just starting out"),
+                discord.SelectOption(label="Apprentice", description="Learning the ropes"),
+                discord.SelectOption(label="Journeyman", description="Skilled worker"),
+                discord.SelectOption(label="Master", description="Expert level"),
+                discord.SelectOption(label="Grandmaster", description="The very best"),
+            ],
+            custom_id="tier_select"
+        ))
+
     @discord.ui.select(
         placeholder="Choose your tier...",
         options=[
-            discord.SelectOption(label="Novice", description="Just starting out"),
-            discord.SelectOption(label="Apprentice", description="Learning the ropes"),
-            discord.SelectOption(label="Journeyman", description="Skilled worker"),
-            discord.SelectOption(label="Master", description="Expert level"),
-            discord.SelectOption(label="Grandmaster", description="The very best"),
+            discord.SelectOption(label="Novice"),
+            discord.SelectOption(label="Apprentice"),
+            discord.SelectOption(label="Journeyman"),
+            discord.SelectOption(label="Master"),
+            discord.SelectOption(label="Grandmaster"),
         ]
     )
     async def select_tier(self, interaction: discord.Interaction, select: discord.ui.Select):
         tier = select.values[0]
         set_user_profession(self.user_id, self.profession, tier)
+
         await interaction.response.edit_message(
             content=f"✅ You are now a **{tier} {self.profession}**!",
             view=None
         )
+
 
 
 class AddGathererView(discord.ui.View):
