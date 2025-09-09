@@ -71,16 +71,16 @@ def add_recipe_for_user(user_id, recipe_name):
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
 
-    # Get recipe_id from master list
+    # Look up recipe in master list
     c.execute("SELECT id FROM all_recipes WHERE recipe_name = ?", (recipe_name,))
     result = c.fetchone()
     if not result:
         conn.close()
-        return False  # recipe doesn’t exist in master list
+        return False  # recipe not in master list
 
     recipe_id = result[0]
 
-    # Insert into user_recipes
+    # Add link between user and recipe
     c.execute(
         "INSERT INTO user_recipes (user_id, recipe_id) VALUES (?, ?)",
         (str(user_id), recipe_id)
@@ -93,12 +93,14 @@ def add_recipe_for_user(user_id, recipe_name):
 def get_user_recipes(user_id):
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
+
     c.execute("""
-        SELECT all_recipes.profession, all_recipes.recipe_name
-        FROM user_recipes
-        JOIN all_recipes ON user_recipes.recipe_id = all_recipes.id
-        WHERE user_recipes.user_id = ?
+        SELECT ar.profession, ar.recipe_name
+        FROM user_recipes ur
+        JOIN all_recipes ar ON ur.recipe_id = ar.id
+        WHERE ur.user_id = ?
     """, (str(user_id),))
+
     results = c.fetchall()
     conn.close()
     return results
@@ -106,12 +108,36 @@ def get_user_recipes(user_id):
 def add_recipe(user_id, profession, recipe_name):
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
-    c.execute(
-        "INSERT INTO recipes (user_id, profession, recipe_name) VALUES (?, ?, ?)",
-        (str(user_id), profession, recipe_name)
-    )
+
+    # Ensure table exists
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS user_recipes (
+            user_id TEXT,
+            profession TEXT,
+            recipe_name TEXT
+        )
+    """)
+
+    # Check if recipe already exists
+    c.execute("""
+        SELECT 1 FROM user_recipes 
+        WHERE user_id = ? AND profession = ? AND recipe_name = ?
+    """, (str(user_id), profession, recipe_name))
+
+    if c.fetchone():
+        conn.close()
+        return False  # already exists
+
+    # Insert new recipe
+    c.execute("""
+        INSERT INTO user_recipes (user_id, profession, recipe_name) 
+        VALUES (?, ?, ?)
+    """, (str(user_id), profession, recipe_name))
+
     conn.commit()
     conn.close()
+    return True
+
 
 # ----- Buttons and Views -----
 class RecipeButton(discord.ui.Button):
