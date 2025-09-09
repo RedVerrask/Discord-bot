@@ -116,7 +116,7 @@ profession_icons = {
     "Weapon Smithing": "⚔️",
 }
 
-def set_user_profession(user_id: int, new_profession: str):
+def set_user_profession(user_id: int, new_profession: str, tier: str):
     # Remove user from any old profession
     for members in artisan_registry.values():
         if user_id in members:
@@ -127,10 +127,39 @@ def set_user_profession(user_id: int, new_profession: str):
         artisan_registry[new_profession] = []
 
     # Add to new profession
+    artisan_registry[new_profession][user_id] = tier
     artisan_registry[new_profession].append(user_id)
 
     # Save changes
     save_registry()
+
+class TierSelect(discord.ui.Select):
+    def __init__(self, user_id: int, profession: str):
+        self.user_id = user_id
+        self.profession = profession
+
+        options = [
+            discord.SelectOption(label="Novice", description="Just starting out"),
+            discord.SelectOption(label="Apprentice", description="Learning the ropes"),
+            discord.SelectOption(label="Journeyman", description="Skilled worker"),
+            discord.SelectOption(label="Master", description="Expert level"),
+            discord.SelectOption(label="Grandmaster", description="The very best"),
+        ]
+
+        super().__init__(placeholder="Choose your tier...", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        tier = self.values[0]
+        set_user_profession(self.user_id, self.profession, tier)
+        await interaction.response.send_message(
+            f"You are now a **{tier} {self.profession}**!", ephemeral=True
+        )
+
+class TierSelectView(discord.ui.View):
+    def __init__(self, user_id: int, profession: str):
+        super().__init__(timeout=60)
+        self.add_item(TierSelect(user_id, profession))
+
 
 async def format_artisan_registry(bot: discord.Client):
     embed = discord.Embed(
@@ -140,27 +169,29 @@ async def format_artisan_registry(bot: discord.Client):
     )
 
     for profession, members in artisan_registry.items():
-        if members:
+        if members:  # only add if profession has members
             member_names = []
-            for uid in members:
+            for uid, tier in members.items():
                 user = bot.get_user(uid)
-                if not user:
+                if not user:  # if not cached, fetch from API
                     try:
                         user = await bot.fetch_user(uid)
                     except:
                         user = None
-                if user:
-                    # Use display_name if available, else fallback to username
-                    member_names.append(f"• {user.display_name}")
-                else:
-                    member_names.append(f"• Unknown ({uid})")
 
-            icon = profession_icons.get(profession, "🎓")  # fallback = 🎓
+                if user:
+                    member_names.append(f"• {user.display_name} ({tier})")
+                else:
+                    member_names.append(f"• Unknown ({uid}) ({tier})")
+
+            # Add one field per profession
+            icon = profession_icons.get(profession, "🎓")  # fallback if no icon
             embed.add_field(
                 name=f"{icon} {profession}",
                 value="\n".join(member_names),
                 inline=False
             )
+
 
     # If literally no members anywhere
     if all(len(members) == 0 for members in artisan_registry.values()):
@@ -175,7 +206,9 @@ class AddGathererView(discord.ui.View):
         user_id = interaction.user.id
         set_user_profession(user_id, button.label)
         #Add user to profession if not already added
-        await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
+        await interaction.response.send_message("Select your Mining tier:", view=TierSelectView(user_id, "Mining"), ephemeral=True)
+                                                
+        #await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
 
     
     
