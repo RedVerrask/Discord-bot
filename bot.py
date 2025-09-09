@@ -53,8 +53,11 @@ def fetch_recipes():
 
     with open("recipes.json", "w", encoding="utf-8") as f:
         json.dump(recipes, f, ensure_ascii=False, indent=2)
-    if not recipes_data:
-        recipes_data = ["Placeholder Recipe"]  # prevents crash
+    if not recipes:
+        recipes = ["Placeholder Recipe"]  # prevents crash
+
+    with open("recipes.json", "r", encoding="utf-8") as f:
+        json.dump(recipes, f, ensure_ascii=False, indent=2)
     return recipes
 
 
@@ -108,29 +111,6 @@ def get_user_recipes(user_id):
     conn.close()
     return results
 
-
-
-    # Check if recipe already exists
-    c.execute("""
-        SELECT 1 FROM user_recipes 
-        WHERE user_id = ? AND profession = ? AND recipe_name = ?
-    """, (str(user_id), profession, recipe_name))
-
-    if c.fetchone():
-        conn.close()
-        return False  # already exists
-
-    # Insert new recipe
-    c.execute("""
-        INSERT INTO user_recipes (user_id, profession, recipe_name) 
-        VALUES (?, ?, ?)
-    """, (str(user_id), profession, recipe_name))
-
-    conn.commit()
-    conn.close()
-    return True
-
-
 # ----- Buttons and Views -----
 class RecipeButton(discord.ui.Button):
     def __init__(self, recipe_name):
@@ -139,9 +119,9 @@ class RecipeButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         profession = "Adventurer"
-        add_recipe_for_user(interaction.user.id, profession, self.recipe_name)
+        add_recipe_for_user(interaction.user.id, self.recipe_name)
         await interaction.response.send_message(
-            f"✅ You learned **{self.recipe_name}** as a {profession}!",
+            f"✅ You learned **{self.recipe_name}**!",
             ephemeral=True
         )
 
