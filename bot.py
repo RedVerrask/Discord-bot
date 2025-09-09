@@ -142,26 +142,14 @@ class TierSelectView(discord.ui.View):
         self.user_id = user_id
         self.profession = profession
 
-        self.add_item(discord.ui.Select(
-            placeholder="Choose your tier...",
-            options=[
-                discord.SelectOption(label="Novice", description="Just starting out"),
-                discord.SelectOption(label="Apprentice", description="Learning the ropes"),
-                discord.SelectOption(label="Journeyman", description="Skilled worker"),
-                discord.SelectOption(label="Master", description="Expert level"),
-                discord.SelectOption(label="Grandmaster", description="The very best"),
-            ],
-            custom_id="tier_select"
-        ))
-
     @discord.ui.select(
         placeholder="Choose your tier...",
         options=[
-            discord.SelectOption(label="Novice"),
-            discord.SelectOption(label="Apprentice"),
-            discord.SelectOption(label="Journeyman"),
-            discord.SelectOption(label="Master"),
-            discord.SelectOption(label="Grandmaster"),
+            discord.SelectOption(label="Novice", description="Just starting out"),
+            discord.SelectOption(label="Apprentice", description="Learning the ropes"),
+            discord.SelectOption(label="Journeyman", description="Skilled worker"),
+            discord.SelectOption(label="Master", description="Expert level"),
+            discord.SelectOption(label="Grandmaster", description="The very best"),
         ]
     )
     async def select_tier(self, interaction: discord.Interaction, select: discord.ui.Select):
@@ -175,6 +163,7 @@ class TierSelectView(discord.ui.View):
 
 
 
+
 class AddGathererView(discord.ui.View):
     @discord.ui.button(label="Mining", style=discord.ButtonStyle.secondary)
     async def add_Miner(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -184,6 +173,7 @@ class AddGathererView(discord.ui.View):
             view=TierSelectView(user_id, "Mining"),
             ephemeral=True
         )
+
 
 
     
