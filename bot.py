@@ -133,27 +133,13 @@ def set_user_profession(user_id: int, new_profession: str, tier: str):
     # Save changes
     save_registry()
 
-class TierSelect(discord.ui.Select):
-    def __init__(self, user_id: int, profession: str):
-        self.user_id = user_id
-        self.profession = profession
 
-        options = [
-            discord.SelectOption(label="Novice", description="Just starting out"),
-            discord.SelectOption(label="Apprentice", description="Learning the ropes"),
-            discord.SelectOption(label="Journeyman", description="Skilled worker"),
-            discord.SelectOption(label="Master", description="Expert level"),
-            discord.SelectOption(label="Grandmaster", description="The very best"),
-        ]
 
-        super().__init__(placeholder="Choose your tier...", options=options)
+def set_user_profession(user_id, profession, tier):
+    # update your data structure here
+    # example: user_professions[user_id] = {"profession": profession, "tier": tier}
+    print(f"Saved: {user_id} -> {tier} {profession}")
 
-    async def callback(self, interaction: discord.Interaction):
-        tier = self.values[0]
-        set_user_profession(self.user_id, self.profession, tier)
-        await interaction.response.send_message(
-            f"You are now a **{tier} {self.profession}**!", ephemeral=True
-        )
 
 class TierSelectView(discord.ui.View):
     def __init__(self, user_id, profession):
@@ -164,22 +150,20 @@ class TierSelectView(discord.ui.View):
     @discord.ui.select(
         placeholder="Choose your tier...",
         options=[
-            discord.SelectOption(label="Novice"),
-            discord.SelectOption(label="Apprentice"),
-            discord.SelectOption(label="Journeyman"),
-            discord.SelectOption(label="Master"),
-            discord.SelectOption(label="Grandmaster")
+            discord.SelectOption(label="Novice", description="Just starting out"),
+            discord.SelectOption(label="Apprentice", description="Learning the ropes"),
+            discord.SelectOption(label="Journeyman", description="Skilled worker"),
+            discord.SelectOption(label="Master", description="Expert level"),
+            discord.SelectOption(label="Grandmaster", description="The very best"),
         ]
     )
     async def select_tier(self, interaction: discord.Interaction, select: discord.ui.Select):
         tier = select.values[0]
-        # Save profession + tier
-        set_user_profession(self.user_id, self.profession, tier)  
+        set_user_profession(self.user_id, self.profession, tier)
         await interaction.response.edit_message(
             content=f"✅ You are now a **{tier} {self.profession}**!",
             view=None
         )
-
 
 
 class AddGathererView(discord.ui.View):
@@ -190,7 +174,8 @@ class AddGathererView(discord.ui.View):
             "Select your Mining tier:",
             view=TierSelectView(user_id, "Mining"),
             ephemeral=True
-    )
+        )
+
 
     
     
