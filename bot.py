@@ -88,35 +88,36 @@ def set_user_profession(user_id: int, new_profession: str):
 
 async def format_artisan_registry(bot: discord.Client):
     embed = discord.Embed(
-        title="Current Artisan Registry",
-        description="Here’s a list of professions and their members:",
-        color=discord.Color.green()
+        title="⚒️ Artisan Registry",
+        description="Here’s the current list of professions and their members:",
+        color=discord.Color.blurple()
     )
 
     for profession, members in artisan_registry.items():
         if members:
-            # Convert user IDs -> usernames
             member_names = []
             for uid in members:
-                user = bot.get_user(uid)  # Try to fetch cached user
+                user = bot.get_user(uid)
                 if not user:
                     try:
-                        user = await bot.fetch_user(uid)  # Fetch from API if not cached
+                        user = await bot.fetch_user(uid)
                     except:
                         user = None
-                member_names.append(user.name if user else f"Unknown ({uid})")
+                if user:
+                    # Use display_name if available, else fallback to username
+                    member_names.append(f"• {user.display_name}")
+                else:
+                    member_names.append(f"• Unknown ({uid})")
 
             embed.add_field(
-                name=profession,
-                value=", ".join(member_names),
+                name=f"🎓 {profession}",
+                value="\n".join(member_names),
                 inline=False
             )
-        else:
-            embed.add_field(
-                name=profession,
-                value="*No members yet*",
-                inline=False
-            )
+
+    # If literally no members anywhere
+    if all(len(members) == 0 for members in artisan_registry.values()):
+        embed.description = "*No artisans have joined any profession yet.*"
 
     return embed
 
