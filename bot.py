@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from enum import Enum
 import sqlite3
 import os
 import asyncio  # make sure this is at the top of your file
@@ -29,20 +30,17 @@ def init_db():
     """)
     conn.commit()
     conn.close()
-ALL_RECIPES = ["Potion of Healing", "Iron Sword", "Mana Elixir"]  # example
 
-class RecipeChoices(commands.Transformer):
-    @classmethod
-    async def transform(cls, interaction, value):
-        if value in ALL_RECIPES:
-            return value
-        raise commands.TransformError(f"{value} is not a valid recipe")
-    
+class Recipes(str, Enum):
+    POTION = "Potion of Healing"
+    SWORD = "Iron Sword"
+    ELIXIR = "Mana Elixir"
+
 @bot.tree.command(name="learn_recipe", description="Learn a recipe")
 @commands.describe(recipe="Select a recipe to learn")
-async def learn_recipe(interaction: discord.Interaction, recipe: RecipeChoices):
-    add_recipe(interaction.user.id, recipe)
-    await interaction.response.send_message(f"✅ You learned **{recipe}**!")
+async def learn_recipe(interaction: discord.Interaction, recipe: Recipes):
+    add_recipe(interaction.user.id, recipe.value)
+    await interaction.response.send_message(f"✅ You learned **{recipe.value}**!")
     
 def add_recipe(user_id, profession, recipe_name):
     conn = sqlite3.connect("recipes.db")
@@ -58,6 +56,11 @@ def get_recipes_by_user(user_id):
     results = c.fetchall()
     conn.close()
     return results
+
+class Recipes(str, Enum):
+    POTION = "Potion of Healing"
+    SWORD = "Iron Sword"
+    ELIXIR = "Mana Elixir"
 
 class HomeView(discord.ui.View):
     def __init__(self):
