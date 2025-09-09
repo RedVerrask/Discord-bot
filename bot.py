@@ -37,23 +37,37 @@ class Recipes(str, Enum):
     SWORD = "Iron Sword"
     ELIXIR = "Mana Elixir"
 
+def init_db():
+    conn = sqlite3.connect("recipes.db")
+    c = conn.cursor()
+    c.execute("""CREATE TABLE IF NOT EXISTS recipes (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, profession TEXT NOT NULL, recipe_name TEXT NOT NULL)""")
+    conn.commit()
+    conn.close()
+
+init_db()
+
 @bot.tree.command(name="learn_recipe", description="Learn a recipe")
 @app_commands.describe(recipe="Select a recipe to learn")
 async def learn_recipe(interaction: discord.Interaction, recipe: Recipes):
     add_recipe(interaction.user.id, recipe.value)
     await interaction.response.send_message(f"✅ You learned **{recipe.value}**!")
     
+# Function to add recipe to DB
 def add_recipe(user_id, profession, recipe_name):
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
-    c.execute("INSERT INTO recipes (user_id, profession, recipe_name) VALUES (?, ?, ?)", (user_id, profession, recipe_name))
+    c.execute(
+        "INSERT INTO recipes (user_id, profession, recipe_name) VALUES (?, ?, ?)",
+        (str(user_id), profession, recipe_name)
+    )
     conn.commit()
     conn.close()
 
-def get_recipes_by_user(user_id):
+# Function to get user recipes
+def get_user_recipes(user_id):
     conn = sqlite3.connect("recipes.db")
     c = conn.cursor()
-    c.execute("SELECT profession, recipe_name FROM recipes WHERE user_id = ?", (user_id,))
+    c.execute("SELECT profession, recipe_name FROM recipes WHERE user_id = ?", (str(user_id),))
     results = c.fetchall()
     conn.close()
     return results
@@ -85,8 +99,7 @@ class RecipeSelect(discord.ui.Select):
                 label=recipe["name"],
                 description=f"Level {recipe['level']}"
             )
-            for recipe in recipes if recipe["profession"] == profession
-        ][:25]  # discord limit: 25 options max
+            for recipe in recipes if recipe["profession"] == profession][:25]  # discord limit: 25 options max
 
         super().__init__(placeholder="Select a recipe...", options=options)
 
@@ -104,6 +117,8 @@ class RecipeSelect(discord.ui.Select):
 class RecipeView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
+        for recipe in Recipes:
+            self.add_item(RecipeButton(recipe_name=recipe.value))
 
     @discord.ui.button(label="Learn Recipe", style=discord.ButtonStyle.success)
     async def add_recipe(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -113,6 +128,18 @@ class RecipeView(discord.ui.View):
     async def list_recipes(self, interaction: discord.Interaction, button: discord.ui.Button):
         # For now, just a placeholder
         await interaction.response.send_message("Here are your recipes:\n- Example Recipe 1\n- Example Recipe 2", ephemeral=True)
+
+class RecipeButton(discord.ui.Button):
+    def __init__(self, recipe_name):
+        super().__init__(label=recipe_name, style=discord.ButtonStyle.success)
+        self.recipe_name = recipe_name
+
+    async def callback(self, interaction: discord.Interaction):
+        # Example: we’ll just use "Adventurer" as a profession for demo
+        profession = "Adventurer"
+        add_recipe(interaction.user.id, profession, self.recipe_name)
+        await interaction.response.send_message(f"✅ You learned **{self.recipe_name}** as a {profession}!", ephemeral=True)
+
 
 #Professions
 
@@ -448,17 +475,19 @@ async def home(interaction: discord.Interaction):
         )
 
 
-@bot.tree.command(name="myrecipes", description="View your learned recipes")
-async def myrecipes(interaction: discord.Interaction):
-    recipes = get_recipes_by_user(interaction.user.id)
+@bot.command()
+async def learn(ctx):
+    await ctx.send("Click a recipe to learn it:", view=RecipeView())
+
+# Command to view learned recipes
+@bot.command()
+async def myrecipes(ctx):
+    recipes = get_user_recipes(ctx.author.id)
     if not recipes:
-        await interaction.response.send_message("You haven’t learned any recipes yet!", ephemeral=True)
+        await ctx.send("You haven’t learned any recipes yet!")
     else:
         recipe_list = "\n".join([f"{prof}: {name}" for prof, name in recipes])
-        await interaction.response.send_message(
-            f"📜 **Your Recipes:**\n{recipe_list}",
-            ephemeral=True
-        )
+        await ctx.send(f"📜 Your Recipes:\n{recipe_list}")
 
 
 GUILD_ID = 1064785222576644137  # your server ID
