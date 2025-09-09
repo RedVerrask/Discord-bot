@@ -15,7 +15,19 @@ intents.members = True # usefule for guild bots
 bot = commands.Bot(command_prefix="!", intents=intents)
 ADMIN_USER_IDS = [359521236663009293]  # Replace with your actual Discord user ID
 
-
+def init_db():
+    conn = sqlite3.connect("recipes.db")
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS recipes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            profession TEXT NOT NULL,
+            recipe_name TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 # Function to fetch recipes from Ashes Codex
 def fetch_recipes():
