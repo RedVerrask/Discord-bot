@@ -46,6 +46,16 @@ init_db()
 
 # Function to fetch recipes from Ashes Codex
 def fetch_recipes():
+    # ✅ If we already have a local copy, just load it
+    if os.path.exists("recipes.json"):
+        with open("recipes.json", "r", encoding="utf-8") as f:
+            recipes = json.load(f)
+        print("Loaded recipes from local file.")
+        return recipes
+
+    # ❌ No local file → scrape from website
+    print("No local file found, scraping recipes...")
+
     base_url = "https://ashescodex.com/db/items/consumable/recipe/page/{}?stats=&sortColumn=name&sortDir=asc"
     recipes = []
     page = 1
@@ -53,20 +63,24 @@ def fetch_recipes():
     while True:
         url = base_url.format(page)
         response = requests.get(url)
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        page_recipes = [item.text.strip() for item in soup.select("li a") if item.text.strip()]
-        if not page_recipes:
+        if response.status_code != 200:
             break
 
+        soup = BeautifulSoup(response.text, "html.parser")
+        page_recipes = [item.text.strip() for item in soup.select("li a")]
+
+        if not page_recipes:
+            break  # no more pages
         recipes.extend(page_recipes)
         page += 1
 
-    # ✅ Save recipes to file after scraping
+    # ✅ Save scraped data to JSON for future use
     with open("recipes.json", "w", encoding="utf-8") as f:
         json.dump(recipes, f, ensure_ascii=False, indent=2)
 
+    print(f"Scraped {len(recipes)} recipes and saved to recipes.json")
     return recipes
+
 
 
 
