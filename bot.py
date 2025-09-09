@@ -133,27 +133,31 @@ def set_user_profession(user_id: int, new_profession: str, tier: str):
     # Save changes
     save_registry()
 
-class TierSelect(discord.ui.Select):
-    def __init__(self, user_id: int, profession: str):
+class TierSelectView(discord.ui.View):
+    def __init__(self, user_id, profession):
+        super().__init__(timeout=None)
         self.user_id = user_id
         self.profession = profession
 
-        options = [
-            discord.SelectOption(label="Novice", description="Just starting out"),
-            discord.SelectOption(label="Apprentice", description="Learning the ropes"),
-            discord.SelectOption(label="Journeyman", description="Skilled worker"),
-            discord.SelectOption(label="Master", description="Expert level"),
-            discord.SelectOption(label="Grandmaster", description="The very best"),
+    @discord.ui.select(
+        placeholder="Choose your tier...",
+        options=[
+            discord.SelectOption(label="Novice"),
+            discord.SelectOption(label="Apprentice"),
+            discord.SelectOption(label="Journeyman"),
+            discord.SelectOption(label="Master"),
+            discord.SelectOption(label="Grandmaster")
         ]
-
-        super().__init__(placeholder="Choose your tier...", options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        tier = self.values[0]
-        set_user_profession(self.user_id, self.profession, tier)
-        await interaction.response.send_message(
-            f"You are now a **{tier} {self.profession}**!", ephemeral=True
+    )
+    async def select_tier(self, interaction: discord.Interaction, select: discord.ui.Select):
+        tier = select.values[0]
+        # Save profession + tier
+        set_user_profession(self.user_id, self.profession, tier)  
+        await interaction.response.edit_message(
+            content=f"✅ You are now a **{tier} {self.profession}**!",
+            view=None
         )
+
 
 class TierSelectView(discord.ui.View):
     def __init__(self, user_id: int, profession: str):
@@ -204,11 +208,11 @@ class AddGathererView(discord.ui.View):
     @discord.ui.button(label="Mining", style=discord.ButtonStyle.secondary)
     async def add_Miner(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        set_user_profession(user_id, button.label)
-        #Add user to profession if not already added
-        await interaction.response.send_message("Select your Mining tier:", view=TierSelectView(user_id, "Mining"), ephemeral=True)
-                                                
-        #await interaction.response.send_message(" You are now in the **"+ button.label +"** profession!", view=HomeView(), ephemeral=True)
+        await interaction.response.send_message(
+            "Select your Mining tier:",
+            view=TierSelectView(user_id, "Mining"),
+            ephemeral=True
+        )
 
     
     
