@@ -156,10 +156,8 @@ class TierSelectView(discord.ui.View):
         tier = select.values[0]
         set_user_profession(self.user_id, self.profession, tier)
 
-        await interaction.response.edit_message(
-            content=f"✅ You are now a **{tier} {self.profession}**!",
-            view=None
-        )
+        await interaction.response.send_message(f"✅ You are now a **{tier} {self.profession}**!",ephemeral=True)
+
 
 
 
@@ -168,11 +166,8 @@ class AddGathererView(discord.ui.View):
     @discord.ui.button(label="Mining", style=discord.ButtonStyle.secondary)
     async def add_Miner(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_id = interaction.user.id
-        await interaction.response.send_message(
-            "Select your Mining tier:",
-            view=TierSelectView(user_id, "Mining"),
-            ephemeral=True
-        )
+        await interaction.response.send_message("Select your Mining tier:",view=TierSelectView(user_id, "Mining"),ephemeral=True)
+
 
 
 
