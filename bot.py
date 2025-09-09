@@ -11,6 +11,8 @@ intents.members = True # usefule for guild bots
 bot = commands.Bot(command_prefix="!", intents=intents)
 ADMIN_USER_IDS = [359521236663009293]  # Replace with your actual Discord user ID
 
+
+
 with open("recipes.json", "r", encoding="utf-8") as f:
     recipes = json.load(f)
 
@@ -460,7 +462,8 @@ async def myrecipes(interaction: discord.Interaction):
 
 @bot.event
 async def on_ready():
-    await bot.tree.sync()
-    print(f"Logged in as {bot.user}")
+    GUILD_ID = 123456789012345678  # your server ID
+    guild = discord.Object(id=GUILD_ID)
+    await bot.tree.sync(guild=guild)
 
 bot.run(os.environ['DISCORD_TOKEN'])
