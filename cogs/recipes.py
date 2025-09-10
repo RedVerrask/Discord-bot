@@ -259,7 +259,14 @@ class Recipes(commands.Cog):
         self.user_portfolios = self.load_portfolios()  # Load from portfolios.json
 
     def get_all_recipes(self):
-        return self.recipes_data["recipes"]
+        # Remove "Recipe: " prefix for display/search
+        cleaned = []
+        for r in self.recipes_data["recipes"]:
+            recipe = r.copy()
+            if recipe["name"].startswith("Recipe: "):
+                recipe["name"] = recipe["name"][8:]  # remove first 8 chars
+            cleaned.append(recipe)
+        return cleaned
 
     def user_has_profession(self, user_id):
         professions_cog = self.bot.get_cog("Professions")
