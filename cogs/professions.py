@@ -36,12 +36,12 @@ class Professions(commands.Cog):
         self.save_registry()
 
     # ----- Format Registry -----
-    async def format_artisan_registry(self, bot: commands.Bot, guild_id: int = None) -> discord.Embed:
+    async def format_artisan_registry(self, bot: commands.Bot, guild_id: int = None) -> list:
         """
-        Returns a single embed showing all current professions in columns:
-        - Categories are horizontal: Gatherers | Processors | Crafters
-        - Each user appears next to their profession: Fishing - Red (*tier*)
-        - Uses guild nicknames if available; falls back to global username.
+        Returns two embeds:
+        1. Filled professions (only professions with users)
+        2. Empty professions (vacant professions)
+        Shows user first, then color-coded tier.
         """
         profession_icons = {
             "Fishing": "🎣", "Herbalism": "🌿", "Hunting": "🏹", "Lumberjacking": "🪓", "Mining": "⛏️",
@@ -49,6 +49,14 @@ class Professions(commands.Cog):
             "Metalworking": "⚒️", "Stonemasonry": "🧱", "Tanning": "🪶", "Weaving": "🧵",
             "Arcane Engineering": "🔮", "Armor Smithing": "🛡️", "Carpentry": "🪑", "Jewelry": "💍",
             "Leatherworking": "👢", "Scribing": "📜", "Tailoring": "🧶", "Weapon Smithing": "⚔️",
+        }
+
+        tier_colors = {
+            "1": "⚪",
+            "2": "🟢",
+            "3": "🔵",
+            "4": "🟣",
+            "5": "🟠"
         }
 
         categories = {
@@ -59,49 +67,46 @@ class Professions(commands.Cog):
                         "Leatherworking", "Scribing", "Tailoring", "Weapon Smithing"],
         }
 
-        embed = discord.Embed(title="Current Professions", color=discord.Color.blurple())
+        filled_embed = discord.Embed(title="Current Professions", color=discord.Color.blurple())
+        empty_embed = discord.Embed(title="Vacant Professions", color=discord.Color.greyple())
 
-        # Fetch the guild if provided
         guild = bot.get_guild(guild_id) if guild_id else None
 
-        # We'll build one "row" per profession line
-        # Determine max number of professions in a category
-        max_rows = max(len(categories[cat]) for cat in categories)
+        for category_name, professions in categories.items():
+            filled_text = ""
+            empty_text = ""
 
-        for i in range(max_rows):
-            line_parts = []
-            for cat_name in ["Gatherers", "Processors", "Crafters"]:
-                professions = categories[cat_name]
-                if i < len(professions):
-                    prof = professions[i]
-                    members = self.artisan_registry.get(prof, {})
-
-                    if members:
-                        member_texts = []
-                        for user_id, tier in members.items():
-                            display_name = "Unknown"
-                            # Try guild nickname first
-                            if guild:
-                                member = guild.get_member(int(user_id))
-                                if member:
-                                    display_name = member.display_name
-                            # Fallback to global username
-                            if display_name == "Unknown":
-                                try:
-                                    user = await bot.fetch_user(int(user_id))
-                                    display_name = user.name
-                                except Exception:
-                                    pass
-                            member_texts.append(f"{display_name} (*{tier}*)")
-                        line = f"{profession_icons.get(prof,'')} {prof} - " + ", ".join(member_texts)
-                    else:
-                        line = f"{profession_icons.get(prof,'')} {prof} - *Empty*"
+            for prof in professions:
+                members = self.artisan_registry.get(prof, {})
+                if members:
+                    member_lines = []
+                    for user_id, tier in members.items():
+                        # get display name
+                        display_name = "Unknown"
+                        if guild:
+                            member = guild.get_member(int(user_id))
+                            if member:
+                                display_name = member.display_name
+                        if display_name == "Unknown":
+                            try:
+                                user = await bot.fetch_user(int(user_id))
+                                display_name = user.name
+                            except Exception:
+                                pass
+                        # swap user and tier, add color
+                        color = tier_colors.get(str(tier), "⚪")
+                        member_lines.append(f"{display_name} - {color} Tier {tier}")
+                    filled_text += f"{profession_icons.get(prof,'')} {prof}: " + ", ".join(member_lines) + "\n"
                 else:
-                    line = ""
-                line_parts.append(line.ljust(40))  # pad for column alignment
-            embed.add_field(name="\u200b", value="".join(line_parts), inline=False)
+                    empty_text += f"{profession_icons.get(prof,'')} {prof} - *Empty*\n"
 
-        return embed
+            if filled_text:
+                filled_embed.add_field(name=f"**{category_name}**", value=filled_text, inline=False)
+            if empty_text:
+                empty_embed.add_field(name=f"**{category_name}**", value=empty_text, inline=False)
+
+        return [filled_embed, empty_embed]
+
 
 
 
