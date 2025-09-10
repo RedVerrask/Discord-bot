@@ -136,6 +136,65 @@ async def debug(interaction: discord.Interaction):
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+@bot.event
+async def on_interaction(interaction: discord.Interaction):
+    try:
+        # Log basic interaction info
+        logger.info(
+            f"[INTERACTION] User: {interaction.user} | "
+            f"Type: {interaction.type} | "
+            f"Custom ID: {interaction.data.get('custom_id', 'N/A') if interaction.data else 'N/A'} | "
+            f"Values: {interaction.data.get('values', 'N/A') if interaction.data else 'N/A'}"
+        )
+
+        # Check if it's a component interaction (buttons or dropdowns)
+        if interaction.type == discord.InteractionType.component:
+            logger.debug(f"[COMPONENT] Component data: {interaction.data}")
+
+        # Check if it's a modal submit
+        elif interaction.type == discord.InteractionType.modal_submit:
+            logger.debug(f"[MODAL SUBMIT] Modal data: {interaction.data}")
+
+        # Pass the event to the default Discord handler
+        await bot.process_application_commands(interaction)
+    except Exception as e:
+        logger.error(f"⚠️ Interaction error: {e}", exc_info=True)
+        try:
+            await interaction.response.send_message(
+                f"⚠️ Something went wrong: `{e}`",
+                ephemeral=True
+            )
+        except:
+            pass
+@bot.tree.command(name="debug-recipes", description="Debug the recipes system")
+async def debug_recipes(interaction: discord.Interaction):
+    logger.info(f"🔍 Running recipes debug for {interaction.user}")
+
+    recipes_cog = bot.get_cog("Recipes")
+    professions_cog = bot.get_cog("Professions")
+
+    if not recipes_cog:
+        await interaction.response.send_message("⚠️ Recipes cog not loaded!", ephemeral=True)
+        return
+
+    if not professions_cog:
+        await interaction.response.send_message("⚠️ Professions cog not loaded!", ephemeral=True)
+        return
+
+    total_recipes = len(recipes_cog.get_all_recipes())
+    user_professions = professions_cog.get_user_professions(interaction.user.id)
+
+    embed = discord.Embed(
+        title="🛠 Recipes System Debug",
+        color=discord.Color.blurple()
+    )
+    embed.add_field(name="Total Recipes Loaded", value=str(total_recipes), inline=True)
+    embed.add_field(name="Your Professions", value=", ".join(user_professions) or "None", inline=True)
+    embed.add_field(name="Portfolio Entries", value=str(len(recipes_cog.user_portfolios)), inline=True)
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
 # ------------------------------------------------------
 # Run Bot
 # ------------------------------------------------------
