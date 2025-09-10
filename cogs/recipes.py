@@ -118,8 +118,15 @@ class Recipes(commands.Cog):
 # ======================================================
 # Type-to-Search Modal (used by Search + Learn)
 # ======================================================
+# ======================================================
+# Type-to-Search Modal (patched with paginated results)
+# ======================================================
 class RecipeSearchModal(Modal, title="Search Recipes"):
-    query = TextInput(label="Recipe name (partial ok)", placeholder="e.g., ‘sword’, ‘oak plank’, ‘stew’", required=True)
+    query = TextInput(
+        label="Recipe name (partial ok)",
+        placeholder="e.g., sword, oak plank, stew",
+        required=True
+    )
 
     def __init__(self, recipes_cog: Recipes, user_id: int, profession: str | None = None):
         super().__init__(timeout=None)
@@ -133,14 +140,16 @@ class RecipeSearchModal(Modal, title="Search Recipes"):
             await interaction.response.send_message("⚠️ No recipes matched.", ephemeral=True)
             return
 
-        view = RecipeListView(self.recipes_cog, self.user_id, recipes=results, per_page=6)
+        # NEW: use paginated list view with 20 per page
+        view = RecipeListView(self.recipes_cog, self.user_id, recipes=results, per_page=20)
         await interaction.response.send_message(
             content=f"🔎 Results for “{self.query.value}”"
-                    + (f" in **{self.profession}**" if self.profession and self.profession != "all" else "") + ":",
+                    + (f" in **{self.profession}**" if self.profession and self.profession != "all" else ""),
             embed=view.embed,
             view=view,
             ephemeral=True
         )
+
 
 
 # ======================================================
@@ -278,19 +287,21 @@ class RecipesMainView(View):
 # ======================================================
 # Paginated Recipe List + Learn Buttons
 # ======================================================
+# ======================================================
+# Paginated Recipe List (patched to default 20 per page)
+# ======================================================
 class RecipeListView(View):
-    def __init__(self, recipes_cog: Recipes, user_id: int, recipes=None, page=0, per_page=6, profession=None):
+    def __init__(self, recipes_cog: Recipes, user_id: int, recipes=None, page=0, per_page=20, profession=None):
         super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
         self.user_id = user_id
         self.page = page
-        self.per_page = max(1, min(per_page, 10))  # keep UI snappy
+        self.per_page = max(1, min(per_page, 25))  # Discord max 25 fields
         self.profession = profession
         self.recipes = list(recipes) if recipes is not None else recipes_cog.all_recipes
         self.embed = self._build_embed()
         self._rebuild_buttons()
 
-    # Build a lightweight embed
     def _build_embed(self):
         total = len(self.recipes)
         start = self.page * self.per_page
@@ -311,15 +322,15 @@ class RecipeListView(View):
 
     def _rebuild_buttons(self):
         self.clear_items()
-        # Current page recipe buttons (one per recipe)
         start = self.page * self.per_page
         end = min(start + self.per_page, len(self.recipes))
 
+        # Each recipe gets its own "learn" button
         for r in self.recipes[start:end]:
             label = (r["name"][:78] + "…") if len(r["name"]) > 80 else r["name"]
             self.add_item(RecipeButton(self.recipes_cog, self.user_id, r, label))
 
-        # Pagination + Back
+        # Pagination controls
         if self.page > 0:
             self.add_item(PrevPageButton(self))
         if end < len(self.recipes):
