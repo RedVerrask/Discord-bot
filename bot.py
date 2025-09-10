@@ -15,7 +15,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # ----- Load Cogs -----
 async def load_cogs():
     for filename in os.listdir("./cogs"):
-        if filename.endswith(".py") and filename not in ("views.py",):
+        if filename.endswith(".py") and filename not in ("views.py", "__init__.py"):
             try:
                 await bot.load_extension(f"cogs.{filename[:-3]}")
                 print(f"🔹 Loaded cog: {filename}")
@@ -64,7 +64,7 @@ async def home(interaction: discord.Interaction):
 # ----- Run Bot -----
 async def main():
     async with bot:
-        await load_cogs()  # load cogs before starting
+        await load_cogs()
         await bot.start(os.environ['DISCORD_TOKEN'])
 
 
