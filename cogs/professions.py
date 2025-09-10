@@ -36,13 +36,12 @@ class Professions(commands.Cog):
         self.save_registry()
 
     # ----- Format Registry -----
-    async def format_artisan_registry(self, bot: commands.Bot, guild_id: int = None) -> list:
+    async def format_artisan_registry(self, bot: commands.Bot, guild_id: int = None) -> discord.Embed:
         """
-        Return two embeds:
-        1. Filled professions
-        2. Empty professions
-        Displayed grouped by category, column-aligned for cleaner view.
-        Uses server nicknames if guild_id is provided; otherwise falls back to global username.
+        Return an embed showing all users and their professions:
+        - Filled professions first
+        - Empty professions below
+        - Grouped by category, column-aligned for cleaner view
         """
         profession_icons = {
             "Fishing": "🎣", "Herbalism": "🌿", "Hunting": "🏹", "Lumberjacking": "🪓", "Mining": "⛏️",
@@ -60,28 +59,19 @@ class Professions(commands.Cog):
                         "Leatherworking", "Scribing", "Tailoring", "Weapon Smithing"],
         }
 
-        filled_embed = discord.Embed(title="Current Professions", color=discord.Color.blurple())
-        empty_embed = discord.Embed(title="Vacant Professions", color=discord.Color.greyple())
-        max_columns = 4
+        embed = discord.Embed(title="Current Professions", color=discord.Color.blurple())
+        max_columns = 4  # Users per line
 
-        # Fetch the main guild once
-        guild = bot.get_guild(802732198057869352)  # replace GUILD_ID with your server ID
+        guild = bot.get_guild(guild_id) if guild_id else None
 
         for category_name, professions in categories.items():
-            # Add category header
-            filled_embed.add_field(name=f"**{category_name}**", value="\u200b", inline=False)
-            empty_embed.add_field(name=f"**{category_name}**", value="\u200b", inline=False)
+            embed.add_field(name=f"**{category_name}**", value="\u200b", inline=False)
 
+            # --- First: filled professions ---
             for profession in professions:
                 members = self.artisan_registry.get(profession, {})
-
                 if not members:
-                    empty_embed.add_field(
-                        name=f"{profession_icons.get(profession,'')} {profession}",
-                        value="- Empty -",
-                        inline=False
-                    )
-                    continue
+                    continue  # skip empty for now
 
                 username_line = ""
                 tier_line = ""
@@ -94,21 +84,20 @@ class Professions(commands.Cog):
                     # Try fetching member from guild first
                     member = guild.get_member(int(user_id)) if guild else None
                     if member:
-                        display_name = member.display_name  # nickname if exists
+                        display_name = member.display_name
                     else:
                         try:
-                            user = await bot.fetch_user(int(user_id))  # fallback to global username
+                            user = await bot.fetch_user(int(user_id))
                             display_name = user.name
                         except Exception:
                             display_name = "Unknown"
 
                     display_name_padded = display_name.ljust(15)
                     tier_padded = tier.ljust(15)
-
                     username_line += display_name_padded
-                    tier_line += f"*{tier_padded}*"  # italic for slightly lighter font
-
+                    tier_line += f"*{tier_padded}*"
                     col_count += 1
+
                     if col_count >= max_columns:
                         table_lines.append(username_line)
                         table_lines.append(tier_line)
@@ -116,17 +105,29 @@ class Professions(commands.Cog):
                         tier_line = ""
                         col_count = 0
 
-                if username_line:  # Add remaining users
+                if username_line:
                     table_lines.append(username_line)
                     table_lines.append(tier_line)
 
-                filled_embed.add_field(
+                embed.add_field(
                     name=f"{profession_icons.get(profession,'')} {profession}",
                     value=f"```{chr(10).join(table_lines)}```",
                     inline=False
                 )
 
-        return [filled_embed, empty_embed]
+            # --- Second: empty professions ---
+            for profession in professions:
+                members = self.artisan_registry.get(profession, {})
+                if members:
+                    continue  # skip filled
+
+                embed.add_field(
+                    name=f"{profession_icons.get(profession,'')} {profession}",
+                    value="- Empty -",
+                    inline=False
+                )
+
+        return embed
 
 
 # ----- Setup Cog -----
