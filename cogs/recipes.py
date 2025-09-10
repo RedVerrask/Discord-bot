@@ -225,26 +225,42 @@ class RecipesMainView(View):
         if choice == "learn":
             view = View(timeout=None)
 
-            @discord.ui.button(label="⌨️ Type Recipe Name", style=discord.ButtonStyle.primary, custom_id="learn_type")
-            async def _type_btn(btn_inter: discord.Interaction, _btn: Button):
-                await btn_inter.response.send_modal(RecipeSearchModal(self.recipes_cog, user_id))
+            # ✅ Button: Type Recipe Name
+            type_button = discord.ui.Button(
+                label="⌨️ Type Recipe Name",
+                style=discord.ButtonStyle.primary,
+                custom_id="learn_type"
+            )
+            async def type_callback(interaction_btn: discord.Interaction):
+                await interaction_btn.response.send_modal(
+                    RecipeSearchModal(self.recipes_cog, user_id)
+                )
+            type_button.callback = type_callback
+            view.add_item(type_button)
 
-            @discord.ui.button(label="📜 Browse by Recipe Profession", style=discord.ButtonStyle.secondary, custom_id="learn_browse_prof")
-            async def _browse_btn(btn_inter: discord.Interaction, _btn: Button):
-                await btn_inter.response.edit_message(
+            # ✅ Button: Browse by Recipe Profession
+            browse_button = discord.ui.Button(
+                label="📜 Browse by Recipe Profession",
+                style=discord.ButtonStyle.secondary,
+                custom_id="learn_browse_prof"
+            )
+            async def browse_callback(interaction_btn: discord.Interaction):
+                await interaction_btn.response.edit_message(
                     content="Select a profession to browse:",
                     view=LearnByProfessionView(self.recipes_cog, user_id),
                     embed=None
                 )
+            browse_button.callback = browse_callback
+            view.add_item(browse_button)
 
-            view.add_item(_type_btn)   # type: ignore
-            view.add_item(_browse_btn) # type: ignore
+            # ✅ Send the dynamic view
             await interaction.response.edit_message(
                 content="How would you like to learn a recipe?",
                 view=view,
                 embed=None
             )
             return
+
 
         # --- Search Recipes ---
         if choice == "search":
