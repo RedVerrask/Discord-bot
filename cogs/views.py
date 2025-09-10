@@ -8,6 +8,15 @@ class HomeView(discord.ui.View):
         super().__init__(timeout=None)
         self.professions_cog = professions_cog
         self.recipes_cog = recipes_cog
+        
+    # Add this button for Artisan menu
+    @discord.ui.button(label="Artisan", style=discord.ButtonStyle.primary)
+    async def artisan_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(
+            "Artisan Menu:",
+            view=AddArtisanView(self.professions_cog, self.recipes_cog),
+            ephemeral=True
+        )
 
     @discord.ui.button(label="Recipes", style=discord.ButtonStyle.primary)
     async def recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
