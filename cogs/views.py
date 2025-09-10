@@ -62,10 +62,12 @@ class TierSelectView(discord.ui.View):
     async def select_tier(self, interaction: discord.Interaction):
         tier = interaction.data["values"][0]
         self.professions_cog.set_user_profession(self.user_id, self.profession, tier)
-        await interaction.response.send_message(
-            f"✅ You are now **Tier {tier} {self.profession}**!",
-            ephemeral=True
-        )
+
+        await interaction.response.edit_message(
+            content=f"✅ You are now **Tier {tier} {self.profession}**!\n\nReturning to Artisan Menu...",
+            view=AddArtisanView(self.professions_cog, self.profession)
+    )
+
 
 # ------------------------------------------------------
 # Gathering Professions View
