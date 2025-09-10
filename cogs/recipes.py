@@ -264,15 +264,19 @@ class UserButton(Button):
         self.user_id = user_id
 
     async def callback(self, interaction: discord.Interaction):
-        portfolio = self.recipes_cog.get_portfolio(self.user_id)
-        embed = discord.Embed(title=f"{interaction.user.display_name}'s Portfolio", color=discord.Color.blue())
-        for recipe in portfolio:
-            embed.add_field(
-                name=recipe['name'],
-                value=f"{recipe['profession']} L{recipe['level']} - [Link]({recipe['url']})",
-                inline=False
-            )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+            portfolio = self.recipes_cog.get_portfolio(self.user_id)
+            embed = discord.Embed(title=f"{interaction.user.display_name}'s Portfolio", color=discord.Color.blue())
+            for recipe in portfolio:
+                embed.add_field(
+                    name=recipe['name'],
+                    value=f"{recipe['profession']} L{recipe['level']} - [Link]({recipe['url']})",
+                    inline=False
+                )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"Error: {e}", ephemeral=True)
 
 
 # ---------------------------
@@ -318,14 +322,17 @@ class RecipeButtonColored(Button):
         self.recipe = recipe
 
     async def callback(self, interaction: discord.Interaction):
-        # Show an embed with recipe info
-        embed = discord.Embed(
-            title=self.recipe["name"],
-            description=f"Profession: {self.recipe['profession']}\nLevel: {self.recipe['level']}",
-            color=discord.Color.green() if self.recipes_cog.has_learned(self.user_id, self.recipe['name']) else discord.Color.red()
-        )
-        embed.add_field(name="Link", value=f"[View Recipe]({self.recipe['url']})", inline=False)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+            embed = discord.Embed(
+                title=self.recipe["name"],
+                description=f"Profession: {self.recipe['profession']}\nLevel: {self.recipe['level']}",
+                color=discord.Color.green() if self.recipes_cog.has_learned(self.user_id, self.recipe['name']) else discord.Color.red()
+            )
+            embed.add_field(name="Link", value=f"[View Recipe]({self.recipe['url']})", inline=False)
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"Error: {e}", ephemeral=True)
 
 
 # ---------------------------
