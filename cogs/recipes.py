@@ -119,17 +119,18 @@ class SearchRecipesView(discord.ui.View):
         select = discord.ui.Select(
             placeholder="Choose a profession...",
             options=options,
-            custom_id="search_recipes_professions"
+            custom_id="search_recipes_select"
         )
         select.callback = self.search
         self.add_item(select)
 
     async def search(self, interaction: discord.Interaction):
-        profession = interaction.data['values'][0]
+        profession = interaction.data["values"][0]
         recipes = self.recipes_cog.get_all_recipes()
 
+        # Filter if profession chosen
         if profession != "all":
-            recipes = [r for r in recipes if r["profession"] == profession]
+            recipes = [r for r in recipes if r["profession"].lower() == profession.lower()]
 
         if not recipes:
             await interaction.response.send_message("⚠️ No recipes found.", ephemeral=True)
@@ -139,6 +140,7 @@ class SearchRecipesView(discord.ui.View):
             content=f"Showing recipes for **{profession}**" if profession != "all" else "Showing **all recipes**:",
             view=RecipeListView(self.recipes_cog, self.user_id, recipes=recipes, profession=None if profession == "all" else profession)
         )
+
 
 
 class RecipesMainView(discord.ui.View):
@@ -235,7 +237,7 @@ class SearchRecipeModal(Modal):
 # ---------------------------
 # Recipe List View
 # ---------------------------
-class RecipeListView(View):
+class RecipeListView(discord.ui.View):
     def __init__(self, recipes_cog, user_id, recipes=None, page=0, per_page=10, profession=None):
         super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
@@ -243,24 +245,41 @@ class RecipeListView(View):
         self.page = page
         self.per_page = per_page
         self.profession = profession
+
+        # Pull all recipes first
         all_recipes = recipes if recipes else self.recipes_cog.get_all_recipes()
-        self.recipes = [r for r in all_recipes if (not profession or r["profession"] == profession)]
+
+        # FIX: Filter by profession properly
+        if profession:
+            self.recipes = [r for r in all_recipes if r["profession"].lower() == profession.lower()]
+        else:
+            self.recipes = all_recipes
+
         self.update_buttons()
 
     def update_buttons(self):
         self.clear_items()
         start = self.page * self.per_page
         end = start + self.per_page
+        recipes_to_show = self.recipes[start:end]
 
-        for recipe in self.recipes[start:end]:
-            label = f"{recipe['name']} ({recipe['profession']} L{recipe['level']})"
-            self.add_item(RecipeButton(self.recipes_cog, self.user_id, recipe, label))
+        # If no recipes → show disabled button
+        if not recipes_to_show:
+            self.add_item(discord.ui.Button(label="No recipes available", disabled=True))
+        else:
+            for recipe in recipes_to_show:
+                label = f"{recipe['name']} (L{recipe['level']})"
+                self.add_item(RecipeButton(self.recipes_cog, self.user_id, recipe, label))
 
+        # Pagination
         if self.page > 0:
             self.add_item(PrevPageButton(self))
-        if (self.page + 1) * self.per_page < len(self.recipes):
+        if end < len(self.recipes):
             self.add_item(NextPageButton(self))
+
+        # Back button → Recipes Main Menu
         self.add_item(BackToMainButton(self.recipes_cog))
+
 
 # ---------------------------
 # Recipe Button
@@ -436,7 +455,7 @@ class Recipes(commands.Cog):
         with open("recipes.json", "r", encoding="utf-8") as f:
             self.recipes_data = json.load(f)
         self.user_portfolios = self.load_portfolios()
-        
+
     def get_users_with_recipes(self):
         users = {}
         for uid, portfolio in self.user_portfolios.items():

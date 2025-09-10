@@ -268,26 +268,32 @@ class AddArtisanView(discord.ui.View):
             ephemeral=True
         )
 
-    @discord.ui.button(
-        label="View Current Professions",
-        style=discord.ButtonStyle.secondary,
-        custom_id="artisan_view_current"
+@discord.ui.button(
+    label="View Current Professions",
+    style=discord.ButtonStyle.secondary,
+    custom_id="artisan_view_current"
+)
+async def view_current(self, interaction: discord.Interaction, button: discord.ui.Button):
+    guild_id = interaction.guild.id if interaction.guild else None
+    embeds = await self.professions_cog.format_artisan_registry(
+        interaction.client,
+        guild_id=guild_id
     )
-    async def view_current(self, interaction: discord.Interaction, button: discord.ui.Button):
-        guild_id = interaction.guild.id if interaction.guild else None
-        embeds = await self.professions_cog.format_artisan_registry(
-            interaction.client,
-            guild_id=guild_id
-        )
-        await interaction.response.send_message(embeds=embeds, ephemeral=True)
 
-    @discord.ui.button(
-        label="Back",
-        style=discord.ButtonStyle.danger,
-        custom_id="artisan_back"
+    home_button = discord.ui.Button(
+        label="🏠 Home",
+        style=discord.ButtonStyle.primary,
+        custom_id="go_home"
     )
-    async def go_back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(
-            content="Back to home:",
+
+    async def back_home(inter):
+        await inter.response.edit_message(
+            content="Returning to Home:",
             view=HomeView(self.professions_cog, self.recipes_cog)
         )
+
+    home_button.callback = back_home
+    view = discord.ui.View(timeout=None)
+    view.add_item(home_button)
+
+    await interaction.response.send_message(embeds=embeds, view=view, ephemeral=True)
