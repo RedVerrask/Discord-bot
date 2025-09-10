@@ -117,8 +117,8 @@ class Professions(commands.Cog):
                         if display_name == "Unknown":
                             try:
                                 user = await bot.fetch_user(int(user_id))
-                                display_name = user.name
-                            except:
+                                display_name = getattr(user, "display_name", None) or getattr(user, "name", f"User {user_id}")
+                            except Exception:
                                 display_name = f"User {user_id}"
 
                         color = tier_colors.get(str(tier), "⚪")
@@ -132,7 +132,20 @@ class Professions(commands.Cog):
             if empty_text:
                 empty_embed.add_field(name=f"**{category_name}**", value=empty_text, inline=False)
 
-        return [filled_embed, empty_embed]
+        embeds = []
+        if filled_embed.fields:
+            embeds.append(filled_embed)
+        if empty_embed.fields:
+            embeds.append(empty_embed)
+
+        if not embeds:
+            embeds.append(discord.Embed(
+                title="📭 No Professions Found",
+                description="Nobody has registered any professions yet.",
+                color=discord.Color.greyple()
+            ))
+
+        return embeds
 
 # ------------------------------------------------------
 # Setup Cog
