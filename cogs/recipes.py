@@ -103,27 +103,41 @@ class LearnRecipeOptionsView(View):
             )
             return
 
+        # Build profession dropdown
         options = [discord.SelectOption(label=prof, value=prof) for prof in user_professions]
-        select = discord.ui.Select(placeholder="Select a profession…", options=options)
+        select = discord.ui.Select(
+            placeholder="Choose a profession…",
+            options=options,
+            custom_id="learn_recipe_select"
+        )
+
         view = discord.ui.View(timeout=None)
         view.add_item(select)
 
-        async def select_callback(inter, select=select):
+        # Correct callback, scoped properly
+        async def select_callback(inter: discord.Interaction):
             profession = select.values[0]
             recipes = [
                 r for r in self.recipes_cog.get_all_recipes()
                 if r["profession"].lower() == profession.lower()
             ]
+
             if not recipes:
-                await inter.response.send_message(f"⚠️ No recipes found for **{profession}**.", ephemeral=True)
+                await inter.response.send_message(
+                    f"⚠️ No recipes found for **{profession}**.",
+                    ephemeral=True
+                )
                 return
+
+            recipe_view = RecipeListView(self.recipes_cog, self.user_id, recipes)
             await inter.response.edit_message(
                 content=f"📜 Recipes for **{profession}**:",
-                embed=RecipeListView(self.recipes_cog, self.user_id, recipes).embed,
-                view=RecipeListView(self.recipes_cog, self.user_id, recipes)
+                embed=recipe_view.embed,
+                view=recipe_view
             )
 
         select.callback = select_callback
+
         await interaction.response.edit_message(
             content="Select your profession to browse recipes:",
             view=view
@@ -132,6 +146,7 @@ class LearnRecipeOptionsView(View):
     @discord.ui.button(label="⌨️ Type Recipe Name", style=discord.ButtonStyle.secondary)
     async def type_recipe(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(SearchRecipeModal(self.recipes_cog, self.user_id))
+
 
 # ------------------------------------------------------
 # Search Recipe Modal
@@ -172,24 +187,61 @@ class SearchRecipesView(View):
         options = [discord.SelectOption(label="All Professions", value="all")] + [
             discord.SelectOption(label=prof, value=prof) for prof in professions
         ]
-        select = discord.ui.Select(placeholder="Choose a profession…", options=options)
+
+        select = discord.ui.Select(
+            placeholder="Choose a profession…",
+            options=options,
+            custom_id="search_recipes_dropdown"
+        )
         self.add_item(select)
 
-        async def search_callback(interaction: discord.Interaction, select=select):
+        async def search_callback(interaction: discord.Interaction):
             profession = select.values[0]
-            recipes = self.recipes_cog.get_all_recipes()
-            if profession != "all":
-                recipes = [r for r in recipes if r["profession"].lower() == profession.lower()]
-            if not recipes:
-                await interaction.response.send_message("⚠️ No recipes found.", ephemeral=True)
-                return
-            await interaction.response.edit_message(
-                content=f"📜 Showing recipes for **{profession}**" if profession != "all" else "📜 Showing all recipes:",
-                embed=RecipeListView(self.recipes_cog, self.user_id, recipes).embed,
-                view=RecipeListView(self.recipes_cog, self.user_id, recipes)
+            await interaction.response.send_modal(
+                SmartSearchModal(self.recipes_cog, self.user_id, profession)
             )
 
         select.callback = search_callback
+
+class SmartSearchModal(Modal):
+    def __init__(self, recipes_cog, user_id, profession):
+        super().__init__(title="🔍 Smart Recipe Search")
+        self.recipes_cog = recipes_cog
+        self.user_id = user_id
+        self.profession = profession
+        self.recipe_input = TextInput(
+            label="Recipe Name (optional)",
+            placeholder="Type part of the recipe name or leave blank for all…",
+            required=False
+        )
+        self.add_item(self.recipe_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        query = self.recipe_input.value.lower().strip()
+        recipes = self.recipes_cog.get_all_recipes()
+
+        # Filter by profession unless "all" is selected
+        if self.profession != "all":
+            recipes = [r for r in recipes if r["profession"].lower() == self.profession.lower()]
+
+        # Filter by recipe name if provided
+        if query:
+            recipes = [r for r in recipes if query in r["name"].lower()]
+
+        if not recipes:
+            await interaction.response.send_message("⚠️ No recipes found.", ephemeral=True)
+            return
+
+        recipe_view = RecipeListView(self.recipes_cog, self.user_id, recipes)
+        await interaction.response.send_message(
+            content=f"📜 Found **{len(recipes)}** recipe(s) "
+                    f"{'in ' + self.profession if self.profession != 'all' else 'across all professions'}:",
+            embed=recipe_view.embed,
+            view=recipe_view,
+            ephemeral=True
+        )
+
+
 
 # ------------------------------------------------------
 # Learned Recipes View
