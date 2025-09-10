@@ -56,6 +56,16 @@ class Recipes(commands.Cog):
             cleaned.append(recipe)
         return cleaned
 
+    def search_recipes_by_user(self, user_id: int, query: str):
+        professions_cog = self.bot.get_cog("Professions")
+        professions = professions_cog.get_user_professions(user_id)
+        if not professions:
+            return []
+        results = []
+        for prof in professions:
+            results.extend(self.search_recipes(query, profession=prof))
+        return results
+
     def search_recipes(self, query: str, profession: str | None = None, limit: int | None = None):
         """Case-insensitive partial search. All tokens must appear in the name."""
         q = (query or "").strip().casefold()
@@ -80,17 +90,23 @@ class Recipes(commands.Cog):
         return bool(professions_cog and professions_cog.get_user_professions(user_id))
 
     def learn_recipe(self, user_id, recipe):
+        """Adds a recipe to the user's portfolio if they haven't learned it yet."""
         uid = str(user_id)
+        lst = self.user_portfolios.setdefault(uid, [])
+
+        # Prevent duplicates by both name + profession
+        if any(r["name"] == recipe["name"] and r["profession"] == recipe["profession"] for r in lst):
+            return False
+
         entry = {
             "name": recipe["name"],
             "profession": recipe["profession"],
             "level": recipe["level"],
             "url": recipe["url"],
         }
-        lst = self.user_portfolios.setdefault(uid, [])
-        if all(r["name"] != entry["name"] for r in lst):
-            lst.append(entry)
-            self._save_portfolios()
+        lst.append(entry)
+        self._save_portfolios()
+        return True
 
     def get_users_with_recipes(self):
         users = {}
@@ -116,15 +132,12 @@ class Recipes(commands.Cog):
 
 
 # ======================================================
-# Type-to-Search Modal (used by Search + Learn)
-# ======================================================
-# ======================================================
-# Type-to-Search Modal (patched with paginated results)
+# Type-to-Search Modal
 # ======================================================
 class RecipeSearchModal(Modal, title="Search Recipes"):
     query = TextInput(
-        label="Recipe name (partial ok)",
-        placeholder="e.g., sword, oak plank, stew",
+        label="Recipe name (you bum, smashin my head against the keyboard for this one thing to work)",
+        placeholder="e.g., sword, 2nd sword division, etc",
         required=True
     )
 
@@ -140,7 +153,6 @@ class RecipeSearchModal(Modal, title="Search Recipes"):
             await interaction.response.send_message("⚠️ No recipes matched.", ephemeral=True)
             return
 
-        # NEW: use paginated list view with 20 per page
         view = RecipeListView(self.recipes_cog, self.user_id, recipes=results, per_page=20)
         await interaction.response.send_message(
             content=f"🔎 Results for “{self.query.value}”"
@@ -151,9 +163,8 @@ class RecipeSearchModal(Modal, title="Search Recipes"):
         )
 
 
-
 # ======================================================
-# Profession picker for LEARN (uses RECIPE professions, not player professions)
+# Profession picker for LEARN
 # ======================================================
 class LearnByProfessionView(View):
     def __init__(self, recipes_cog: Recipes, user_id: int):
@@ -167,8 +178,8 @@ class LearnByProfessionView(View):
         custom_id="learn_profession_from_recipes"
     )
     async def select_profession(self, interaction: discord.Interaction, select: Select):
-        # hydrate options if first time
-        if len(select.options) == 1:  # only "All Professions" present
+        # Hydrate options if first time
+        if len(select.options) == 1:
             select.options = [discord.SelectOption(label="All Professions", value="all")] + [
                 discord.SelectOption(label=p, value=p) for p in self.recipes_cog.professions
             ]
@@ -212,7 +223,6 @@ class RecipesMainView(View):
 
         # --- Learn Recipe ---
         if choice == "learn":
-            # NEW: no dependency on user's professions
             view = View(timeout=None)
 
             @discord.ui.button(label="⌨️ Type Recipe Name", style=discord.ButtonStyle.primary, custom_id="learn_type")
@@ -236,12 +246,12 @@ class RecipesMainView(View):
             )
             return
 
-        # --- Search Recipes (type-only) ---
+        # --- Search Recipes ---
         if choice == "search":
             await interaction.response.send_modal(RecipeSearchModal(self.recipes_cog, user_id))
             return
 
-        # --- Learned Recipes (user picker) ---
+        # --- Learned Recipes ---
         if choice == "learned":
             users_with_recipes = self.recipes_cog.get_users_with_recipes()
             if not users_with_recipes:
@@ -266,9 +276,10 @@ class RecipesMainView(View):
                     embed.description = "*No recipes learned yet.*"
                 else:
                     for r in portfolio[:20]:
+                        url = r.get("url") or "https://example.com"
                         embed.add_field(
                             name=r["name"],
-                            value=f"{r['profession']} L{r['level']} — [🔗 Link]({r['url']})",
+                            value=f"{r['profession']} L{r['level']} — [🔗 Link]({url})",
                             inline=False
                         )
                     if len(portfolio) > 20:
@@ -286,9 +297,6 @@ class RecipesMainView(View):
 
 # ======================================================
 # Paginated Recipe List + Learn Buttons
-# ======================================================
-# ======================================================
-# Paginated Recipe List (patched to default 20 per page)
 # ======================================================
 class RecipeListView(View):
     def __init__(self, recipes_cog: Recipes, user_id: int, recipes=None, page=0, per_page=20, profession=None):
@@ -313,9 +321,10 @@ class RecipeListView(View):
             color=discord.Color.green()
         )
         for r in self.recipes[start:end]:
+            url = r.get("url") or "https://example.com"
             embed.add_field(
                 name=r["name"],
-                value=f"**Prof:** {r['profession']}  •  **Lv:** {r['level']}\n[🔗 View]({r['url']})",
+                value=f"**Prof:** {r['profession']}  •  **Lv:** {r['level']}\n[🔗 View]({url})",
                 inline=False
             )
         return embed
@@ -351,6 +360,14 @@ class RecipeButton(Button):
         self.recipe = recipe
 
     async def callback(self, interaction: discord.Interaction):
+        # Check profession ownership if needed
+        if not self.recipes_cog.user_has_profession(self.user_id):
+            await interaction.response.send_message(
+                "⚠️ You don't have this profession yet!",
+                ephemeral=True
+            )
+            return
+
         view = ConfirmLearnView(self.recipes_cog, self.user_id, self.recipe)
         await interaction.response.send_message(
             f"Learn **{self.recipe['name']}**?",
@@ -368,11 +385,13 @@ class ConfirmLearnView(View):
 
     @discord.ui.button(label="✅ Confirm", style=discord.ButtonStyle.success, custom_id="confirm_learn")
     async def confirm(self, interaction: discord.Interaction, button: Button):
-        self.recipes_cog.learn_recipe(self.user_id, self.recipe)
-        await interaction.response.edit_message(
-            content=f"✅ You learned **{self.recipe['name']}**!",
-            view=None
+        success = self.recipes_cog.learn_recipe(self.user_id, self.recipe)
+        msg = (
+            f"✅ You learned **{self.recipe['name']}**!"
+            if success else
+            f"⚠️ You already know **{self.recipe['name']}**."
         )
+        await interaction.response.edit_message(content=msg, view=None)
 
     @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.danger, custom_id="cancel_learn")
     async def cancel(self, interaction: discord.Interaction, button: Button):

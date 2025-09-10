@@ -34,12 +34,10 @@ class Professions(commands.Cog):
     # Profession Assignment
     # ------------------------------------------------------
     def set_user_profession(self, user_id: int, profession: str, tier: str):
-        """Assigns or updates a user's profession and tier."""
-        # Remove from all other professions first (only 1 active profession per user)
-        for prof, members in self.artisan_registry.items():
-            members.pop(str(user_id), None)
-
-        # Add or update profession tier
+        """
+        Assigns or updates a user's profession and tier.
+        Now allows MULTIPLE professions instead of removing previous ones.
+        """
         if profession not in self.artisan_registry:
             self.artisan_registry[profession] = {}
         self.artisan_registry[profession][str(user_id)] = tier
@@ -53,9 +51,26 @@ class Professions(commands.Cog):
         user_id_str = str(user_id)
         return [prof for prof, members in self.artisan_registry.items() if user_id_str in members]
 
+    def get_user_tier(self, user_id: int, profession: str):
+        """Returns the user's tier for a given profession, or None."""
+        return self.artisan_registry.get(profession, {}).get(str(user_id))
+
     def has_profession(self, user_id: int):
         """Checks if a user has at least one profession."""
         return bool(self.get_user_professions(user_id))
+
+    def can_learn_recipe(self, user_id: int, profession: str, required_level: int):
+        """
+        Returns True if the user has the profession and meets the tier requirement.
+        Recipes can use this to restrict access.
+        """
+        tier = self.get_user_tier(user_id, profession)
+        if tier is None:
+            return False  # Doesn't have the profession at all
+        try:
+            return int(tier) >= int(required_level)
+        except ValueError:
+            return False
 
     # ------------------------------------------------------
     # Profession Registry Formatting (Embeds)
@@ -146,6 +161,7 @@ class Professions(commands.Cog):
             ))
 
         return embeds
+
 
 # ------------------------------------------------------
 # Setup Cog

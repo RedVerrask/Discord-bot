@@ -22,10 +22,11 @@ class HomeView(discord.ui.View):
     @discord.ui.button(label="Recipes", style=discord.ButtonStyle.primary, custom_id="home_recipes")
     async def recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
-            "Recipe Menu:",
+            "📖 Recipe Menu:",
             view=RecipesMainView(self.recipes_cog),
             ephemeral=True
         )
+
 
 # ======================================================
 # Tier Select (returns to Artisan menu)
@@ -56,6 +57,7 @@ class TierSelectView(discord.ui.View):
             content=f"✅ You are now **Tier {tier} {self.profession}**!\n\nReturning to Artisan Menu…",
             view=AddArtisanView(self.professions_cog, self.recipes_cog)
         )
+
 
 # ======================================================
 # Gathering / Processing / Crafting
@@ -90,6 +92,7 @@ class AddGathererView(discord.ui.View):
         b.callback = cb
         return b
 
+
 class AddProcessingView(discord.ui.View):
     def __init__(self, professions_cog, recipes_cog):
         super().__init__(timeout=None)
@@ -119,6 +122,7 @@ class AddProcessingView(discord.ui.View):
             )
         b.callback = cb
         return b
+
 
 class AddCraftingView(discord.ui.View):
     def __init__(self, professions_cog, recipes_cog):
@@ -150,6 +154,7 @@ class AddCraftingView(discord.ui.View):
         b.callback = cb
         return b
 
+
 # ======================================================
 # Root Artisan Menu
 # ======================================================
@@ -161,15 +166,27 @@ class AddArtisanView(discord.ui.View):
 
     @discord.ui.button(label="Gathering Professions", style=discord.ButtonStyle.secondary, custom_id="artisan_gathering")
     async def gathering(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Gathering Menu:", view=AddGathererView(self.professions_cog, self.recipes_cog), ephemeral=True)
+        await interaction.response.send_message(
+            "Gathering Menu:",
+            view=AddGathererView(self.professions_cog, self.recipes_cog),
+            ephemeral=True
+        )
 
     @discord.ui.button(label="Processing Professions", style=discord.ButtonStyle.secondary, custom_id="artisan_processing")
     async def processing(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Processing Menu:", view=AddProcessingView(self.professions_cog, self.recipes_cog), ephemeral=True)
+        await interaction.response.send_message(
+            "Processing Menu:",
+            view=AddProcessingView(self.professions_cog, self.recipes_cog),
+            ephemeral=True
+        )
 
     @discord.ui.button(label="Crafting Professions", style=discord.ButtonStyle.secondary, custom_id="artisan_crafting")
     async def crafting(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Crafting Menu:", view=AddCraftingView(self.professions_cog, self.recipes_cog), ephemeral=True)
+        await interaction.response.send_message(
+            "Crafting Menu:",
+            view=AddCraftingView(self.professions_cog, self.recipes_cog),
+            ephemeral=True
+        )
 
     @discord.ui.button(label="View Current Professions", style=discord.ButtonStyle.success, custom_id="artisan_view_current")
     async def view_current(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -179,7 +196,10 @@ class AddArtisanView(discord.ui.View):
         home_button = discord.ui.Button(label="🏠 Home", style=discord.ButtonStyle.primary, custom_id="go_home")
 
         async def back_home(inter):
-            await inter.response.edit_message(content="Returning to Home:", view=HomeView(self.professions_cog, self.recipes_cog))
+            await inter.response.edit_message(
+                content="Returning to Home:",
+                view=HomeView(self.professions_cog, self.recipes_cog)
+            )
 
         home_button.callback = back_home
         view = discord.ui.View(timeout=None)
@@ -189,4 +209,3 @@ class AddArtisanView(discord.ui.View):
             await interaction.response.send_message("⚠️ No profession data found.", ephemeral=True)
         else:
             await interaction.response.send_message(embeds=embeds, view=view, ephemeral=True)
-
