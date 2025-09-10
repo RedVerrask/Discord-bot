@@ -88,11 +88,9 @@ class Professions(commands.Cog):
                             if member:
                                 display_name = member.display_name
                         if display_name == "Unknown":
-                            try:
-                                user = await bot.fetch_user(int(user_id))
-                                display_name = user.name
-                            except Exception:
-                                pass
+                            user = await bot.fetch_user(int(user_id))
+                            display_name = user.name
+                            
                         # swap user and tier, add color
                         color = tier_colors.get(str(tier), "⚪")
                         member_lines.append(f"{display_name} - {color} Tier {tier}")
