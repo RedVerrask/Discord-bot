@@ -8,6 +8,19 @@ from collections import defaultdict
 PORTFOLIO_FILE = "portfolios.json"
 
 
+# Mapping recipes.json professions → artisan professions
+PROFESSION_MAP = {
+    "Leather Worker": "Leatherworking",
+    "Leatherworking": "Leatherworking",
+    "Scribe": "Scribing",
+    "Jeweler": "Jewelry",
+    "Metal Worker": "Metalworking",
+    "Lumberjack": "Lumberjacking",
+    "Stone Mason": "Stonemasonry",
+    # Add more mappings if needed later
+}
+
+
 # ======================================================
 # Recipes Cog
 # ======================================================
@@ -47,7 +60,8 @@ class Recipes(commands.Cog):
             except (ValueError, TypeError):
                 recipe["level"] = 0
             # Profession
-            recipe["profession"] = str(r.get("profession", "Unknown")).strip()
+            raw_prof = str(r.get("profession", "Unknown")).strip()
+            recipe["profession"] = PROFESSION_MAP.get(raw_prof, raw_prof)
             # URL
             url = str(r.get("url", "")).strip()
             recipe["url"] = url if url else "https://example.com"
@@ -172,29 +186,43 @@ class LearnByProfessionView(View):
         self.recipes_cog = recipes_cog
         self.user_id = user_id
 
-    @discord.ui.select(
-        placeholder="Browse by recipe profession…",
-        options=[discord.SelectOption(label="All Professions", value="all")],
-        custom_id="learn_profession_from_recipes"
-    )
-    async def select_profession(self, interaction: discord.Interaction, select: Select):
-        # Hydrate options if first time
-        if len(select.options) == 1:
-            select.options = [discord.SelectOption(label="All Professions", value="all")] + [
-                discord.SelectOption(label=p, value=p) for p in self.recipes_cog.professions
-            ]
-            await interaction.response.edit_message(content="Pick a profession to browse:", view=self)
-            return
+        # Get user's professions from artisan registry
+        professions_cog = self.recipes_cog.bot.get_cog("Professions")
+        user_professions = professions_cog.get_user_professions(user_id) if professions_cog else []
 
-        profession = select.values[0] if select.values else "all"
-        pool = self.recipes_cog.all_recipes if profession == "all" else self.recipes_cog.by_profession.get(profession.lower(), [])
+        # If user has no professions, show an error
+        if not user_professions:
+            self.add_item(discord.ui.Button(
+                label="⚠️ No professions set",
+                style=discord.ButtonStyle.danger,
+                disabled=True
+            ))
+        else:
+            # Populate dropdown dynamically with ONLY user's professions
+            self.add_item(discord.ui.Select(
+                placeholder="Select a profession to browse…",
+                options=[
+                    discord.SelectOption(label=prof, value=prof)
+                    for prof in sorted(user_professions)
+                ],
+                custom_id="learn_profession_from_recipes"
+            ))
+
+    @discord.ui.select(custom_id="learn_profession_from_recipes")
+    async def select_profession(self, interaction: discord.Interaction, select: Select):
+        profession = select.values[0]
+        pool = self.recipes_cog.by_profession.get(profession.lower(), [])
+
         if not pool:
-            await interaction.response.send_message("⚠️ No recipes found.", ephemeral=True)
+            await interaction.response.send_message(
+                f"⚠️ No recipes found for **{profession}**.",
+                ephemeral=True
+            )
             return
 
         view = RecipeListView(self.recipes_cog, self.user_id, recipes=pool, per_page=6)
         await interaction.response.edit_message(
-            content=f"📜 Browsing **{profession}** recipes" if profession != "all" else "📜 Browsing all recipes",
+            content=f"📜 Browsing **{profession}** recipes",
             embed=view.embed,
             view=view
         )
