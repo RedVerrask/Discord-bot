@@ -185,5 +185,8 @@ class AddArtisanView(discord.ui.View):
         view = discord.ui.View(timeout=None)
         view.add_item(home_button)
 
-        await interaction.response.send_message(embeds=embeds, view=view, ephemeral=True)
+        if not embeds:
+            await interaction.response.send_message("⚠️ No profession data found.", ephemeral=True)
+        else:
+            await interaction.response.send_message(embeds=embeds, view=view, ephemeral=True)
 
