@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import os
 import asyncio
-from cogs.views import HomeView  # type: ignore
+from cogs.views import HomeView
 
 # ----- Bot Intents -----
 intents = discord.Intents.default()
@@ -11,27 +11,32 @@ intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-
 # ----- Load Cogs -----
 async def load_cogs():
-    for filename in os.listdir("./cogs"):
-        if filename.endswith(".py") and filename not in ("views.py", "__init__.py"):
-            try:
-                await bot.load_extension(f"cogs.{filename[:-3]}")
-                print(f"🔹 Loaded cog: {filename}")
-            except Exception as e:
-                print(f"❌ Failed to load cog {filename}: {e}")
-
+    cogs_to_load = ["professions", "recipes", "views"]
+    for cog in cogs_to_load:
+        try:
+            await bot.load_extension(f"cogs.{cog}")
+            print(f"🔹 Loaded cog: {cog}")
+        except Exception as e:
+            print(f"❌ Failed to load {cog}: {e}")
 
 # ----- on_ready Event -----
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
-    GUILD_ID = 1064785222576644137  # replace with your guild ID
-    guild = discord.Object(id=GUILD_ID)
-    await bot.tree.sync(guild=guild)
-    print("🌐 Slash commands synced!")
+    try:
+        # Persistent views registration
+        professions_cog = bot.get_cog("Professions")
+        recipes_cog = bot.get_cog("Recipes")
+        if professions_cog and recipes_cog:
+            bot.add_view(HomeView(professions_cog, recipes_cog))
 
+        # Global slash sync
+        await bot.tree.sync()
+        print("🌐 Slash commands synced globally!")
+    except Exception as e:
+        print(f"⚠️ Failed to sync slash commands: {e}")
 
 # ----- Home Slash Command -----
 @bot.tree.command(name="home", description="Open your guild home menu")
@@ -51,7 +56,6 @@ async def home(interaction: discord.Interaction):
             "Welcome to your Guild Home!",
             view=HomeView(professions_cog, recipes_cog)
         )
-
         await interaction.response.send_message(
             "I've sent you a DM with your home menu!", ephemeral=True
         )
@@ -60,13 +64,14 @@ async def home(interaction: discord.Interaction):
             "I couldn't DM you. Please enable DMs.", ephemeral=True
         )
 
-
 # ----- Run Bot -----
 async def main():
     async with bot:
         await load_cogs()
-        await bot.start(os.environ['DISCORD_TOKEN'])
-
+        token = os.getenv("DISCORD_TOKEN")
+        if not token:
+            raise RuntimeError("❌ DISCORD_TOKEN is missing in Railway variables!")
+        await bot.start(token)
 
 if __name__ == "__main__":
     asyncio.run(main())
