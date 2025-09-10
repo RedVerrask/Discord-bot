@@ -169,13 +169,19 @@ class RecipeButton(Button):
 
     async def callback(self, interaction: discord.Interaction):
         try:
-            await interaction.response.send_message(
+            # Acknowledge the interaction first
+            await interaction.response.defer(ephemeral=True)
+
+            # Then send the message with the confirmation view
+            await interaction.followup.send(
                 f"Do you want to learn **{self.recipe['name']}**?",
                 view=ConfirmLearnView(self.recipes_cog, self.user_id, self.recipe),
                 ephemeral=True
             )
         except Exception as e:
-            await interaction.response.send_message(f"Error: {e}", ephemeral=True)
+            # Use followup here too since response might already be deferred
+            await interaction.followup.send(f"Error: {e}", ephemeral=True)
+
 
 
 class ConfirmLearnView(View):
