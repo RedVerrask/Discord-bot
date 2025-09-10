@@ -57,27 +57,31 @@ class Professions(commands.Cog):
         }
 
         for category_name, professions in categories.items():
-            category_text = ""
-            # Build profession/member lines
+            embed.add_field(name=f"**{category_name}**", value="\u200b", inline=False)
+
             for profession in professions:
                 members = self.artisan_registry.get(profession, {})
-                member_list = []
-
                 if not members:
-                    member_list.append("- Empty -")
-                else:
-                    for user_id, tier in members.items():
-                        try:
-                            user = await bot.fetch_user(int(user_id))  # fetch to get username#discriminator
-                            member_list.append(f"{user.name}#{user.discriminator} ({tier})")
-                        except discord.NotFound:
-                            member_list.append(f"Unknown User ({tier})")
+                    embed.add_field(
+                        name=f"{profession_icons.get(profession,'')} {profession}",
+                        value="- Empty -",
+                        inline=False
+                    )
+                    continue
 
-                icon = profession_icons.get(profession, "")
-                # Add profession and members in one line
-                category_text += f"{icon} **{profession}:** " + ", ".join(member_list) + "\n"
+                # Build username line and tier line
+                username_line = ""
+                tier_line = ""
+                for user_id, tier in members.items():
+                    user = bot.get_user(int(user_id))
+                    display_name = user.display_name if user else "Unknown User"
+                    username_line += f"{display_name}    "  # spacing for columns
+                    tier_line += f"*{tier}*    "            # italics for lighter color
 
-            embed.add_field(name=category_name, value=category_text, inline=False)
+                embed.add_field(
+                    name=f"{profession_icons.get(profession,'')} {profession}",
+                    value=f"{username_line}\n{tier_line}",
+                    inline=False)
 
         return embed
 
