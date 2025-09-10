@@ -1,6 +1,7 @@
 import discord
 from .professions import Professions
-from .recipes import Recipes, RecipesMainView  # import your Recipes and RecipesMainView classes
+from .recipes import Recipes, RecipesMainView
+from .artisans import AddArtisanView
 
 # ----- Home View -----
 class HomeView(discord.ui.View):
@@ -8,7 +9,7 @@ class HomeView(discord.ui.View):
         super().__init__(timeout=None)
         self.professions_cog = professions_cog
         self.recipes_cog = recipes_cog
-        
+
     # Add this button for Artisan menu
     @discord.ui.button(label="Artisan", style=discord.ButtonStyle.primary)
     async def artisan_button(self, interaction: discord.Interaction, button: discord.ui.Button):
