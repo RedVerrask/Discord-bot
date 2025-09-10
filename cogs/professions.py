@@ -64,7 +64,8 @@ class Professions(commands.Cog):
         empty_embed = discord.Embed(title="Vacant Professions", color=discord.Color.greyple())
         max_columns = 4
 
-        guild = bot.get_guild(guild_id) if guild_id else None
+        # Fetch the main guild once
+        guild = bot.get_guild(802732198057869352)  # replace GUILD_ID with your server ID
 
         for category_name, professions in categories.items():
             # Add category header
@@ -88,27 +89,24 @@ class Professions(commands.Cog):
                 table_lines = []
 
                 for user_id, tier in members.items():
-                    user = None
                     display_name = "Unknown"
 
-                    # Try fetching from guild first for nickname
-                    if guild:
-                        member = guild.get_member(int(user_id))
-                        if member:
-                            display_name = member.display_name
-                    # Fallback to global user
-                    if display_name == "Unknown":
+                    # Try fetching member from guild first
+                    member = guild.get_member(int(user_id)) if guild else None
+                    if member:
+                        display_name = member.display_name  # nickname if exists
+                    else:
                         try:
-                            user = await bot.fetch_user(int(user_id))
-                            display_name = user.name if user else "Unknown"
-                        except discord.NotFound:
+                            user = await bot.fetch_user(int(user_id))  # fallback to global username
+                            display_name = user.name
+                        except Exception:
                             display_name = "Unknown"
 
                     display_name_padded = display_name.ljust(15)
                     tier_padded = tier.ljust(15)
 
                     username_line += display_name_padded
-                    tier_line += f"*{tier_padded}*"
+                    tier_line += f"*{tier_padded}*"  # italic for slightly lighter font
 
                     col_count += 1
                     if col_count >= max_columns:
@@ -118,7 +116,7 @@ class Professions(commands.Cog):
                         tier_line = ""
                         col_count = 0
 
-                if username_line:
+                if username_line:  # Add remaining users
                     table_lines.append(username_line)
                     table_lines.append(tier_line)
 
