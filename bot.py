@@ -34,7 +34,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # Load Cogs
 # ------------------------------------------------------
 async def load_cogs():
-    cogs_to_load = ["professions", "recipes", "views"]
+    cogs_to_load = ["professions", "recipes"]
     for cog in cogs_to_load:
         try:
             await bot.load_extension(f"cogs.{cog}")

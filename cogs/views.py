@@ -6,12 +6,16 @@ from .recipes import Recipes, RecipesMainView
 # Home View (Main Menu)
 # ------------------------------------------------------
 class HomeView(discord.ui.View):
-    def __init__(self, professions_cog: "Professions", recipes_cog: "Recipes"):
+    def __init__(self, professions_cog, recipes_cog):
         super().__init__(timeout=None)
         self.professions_cog = professions_cog
         self.recipes_cog = recipes_cog
 
-    @discord.ui.button(label="Artisan", style=discord.ButtonStyle.primary)
+    @discord.ui.button(
+        label="Artisan",
+        style=discord.ButtonStyle.primary,
+        custom_id="home_artisan"
+    )
     async def artisan_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
             "Artisan Menu:",
@@ -19,13 +23,18 @@ class HomeView(discord.ui.View):
             ephemeral=True
         )
 
-    @discord.ui.button(label="Recipes", style=discord.ButtonStyle.primary)
+    @discord.ui.button(
+        label="Recipes",
+        style=discord.ButtonStyle.primary,
+        custom_id="home_recipes"
+    )
     async def recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
             "Recipe Menu:",
             view=RecipesMainView(self.recipes_cog),
             ephemeral=True
         )
+
 
 # ------------------------------------------------------
 # Tier Selection View
