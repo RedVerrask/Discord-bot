@@ -21,6 +21,8 @@ formatter = logging.Formatter(
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
+logger.info("🚀 Bot is starting... Loading commands...")
+
 # ------------------------------------------------------
 # Bot Setup
 # ------------------------------------------------------
@@ -46,20 +48,17 @@ async def load_cogs():
 # Bot Ready Event
 # ------------------------------------------------------
 @bot.event
+@bot.event
 async def on_ready():
     logger.info(f"✅ Logged in as {bot.user}")
+
     try:
-        professions_cog = bot.get_cog("Professions")
-        recipes_cog = bot.get_cog("Recipes")
-
-        # Register persistent home view
-        if professions_cog and recipes_cog:
-            bot.add_view(HomeView(professions_cog, recipes_cog))
-
+        # Force global sync
         await bot.tree.sync()
         logger.info("🌐 Slash commands synced globally!")
     except Exception as e:
         logger.error(f"⚠️ Failed to sync slash commands: {e}")
+
 
 # ------------------------------------------------------
 # Home Slash Command
