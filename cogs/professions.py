@@ -36,21 +36,21 @@ class Professions(commands.Cog):
         self.save_registry()
 
     # ----- Format Registry -----
-    async def format_artisan_registry(self, bot: commands.Bot) -> list:
+    async def format_artisan_registry(self, bot: commands.Bot, guild_id: int = None) -> list:
         """
         Return two embeds:
         1. Filled professions
         2. Empty professions
         Displayed grouped by category, column-aligned for cleaner view.
+        Uses server nicknames if guild_id is provided; otherwise falls back to global username.
         """
-        # ---------- Setup ----------
         profession_icons = {
-        "Fishing": "🎣", "Herbalism": "🌿", "Hunting": "🏹", "Lumberjacking": "🪓", "Mining": "⛏️",
-        "Alchemy": "⚗️", "Animal Husbandry": "🐄", "Cooking": "🍳", "Farming": "🌾", "Lumber Milling": "🪵",
-        "Metalworking": "⚒️", "Stonemasonry": "🧱", "Tanning": "🪶", "Weaving": "🧵",
-        "Arcane Engineering": "🔮", "Armor Smithing": "🛡️", "Carpentry": "🪑", "Jewelry": "💍",
-        "Leatherworking": "👢", "Scribing": "📜", "Tailoring": "🧶", "Weapon Smithing": "⚔️",}
-    
+            "Fishing": "🎣", "Herbalism": "🌿", "Hunting": "🏹", "Lumberjacking": "🪓", "Mining": "⛏️",
+            "Alchemy": "⚗️", "Animal Husbandry": "🐄", "Cooking": "🍳", "Farming": "🌾", "Lumber Milling": "🪵",
+            "Metalworking": "⚒️", "Stonemasonry": "🧱", "Tanning": "🪶", "Weaving": "🧵",
+            "Arcane Engineering": "🔮", "Armor Smithing": "🛡️", "Carpentry": "🪑", "Jewelry": "💍",
+            "Leatherworking": "👢", "Scribing": "📜", "Tailoring": "🧶", "Weapon Smithing": "⚔️",
+        }
 
         categories = {
             "Gatherers": ["Fishing", "Herbalism", "Hunting", "Lumberjacking", "Mining"],
@@ -62,11 +62,12 @@ class Professions(commands.Cog):
 
         filled_embed = discord.Embed(title="Current Professions", color=discord.Color.blurple())
         empty_embed = discord.Embed(title="Vacant Professions", color=discord.Color.greyple())
-        max_columns = 4  # users per line
+        max_columns = 4
 
-        # ---------- Loop through categories ----------
+        guild = bot.get_guild(guild_id) if guild_id else None
+
         for category_name, professions in categories.items():
-            # Add category header to both embeds
+            # Add category header
             filled_embed.add_field(name=f"**{category_name}**", value="\u200b", inline=False)
             empty_embed.add_field(name=f"**{category_name}**", value="\u200b", inline=False)
 
@@ -74,32 +75,40 @@ class Professions(commands.Cog):
                 members = self.artisan_registry.get(profession, {})
 
                 if not members:
-                    # Empty professions go to empty_embed
                     empty_embed.add_field(
-                        name=f"{profession_icons.get(profession, '')} {profession}",
+                        name=f"{profession_icons.get(profession,'')} {profession}",
                         value="- Empty -",
                         inline=False
                     )
                     continue
 
-                # Build column-aligned lines for usernames and tiers
                 username_line = ""
                 tier_line = ""
                 col_count = 0
                 table_lines = []
 
                 for user_id, tier in members.items():
-                    try:
-                        user = await bot.fetch_user(int(user_id))  # await needed inside async
-                        display_name = display_name = f"{user.name}#{user.discriminator}"
-                    except discord.NotFound:
-                        display_name = "Unknown"
+                    user = None
+                    display_name = "Unknown"
+
+                    # Try fetching from guild first for nickname
+                    if guild:
+                        member = guild.get_member(int(user_id))
+                        if member:
+                            display_name = member.display_name
+                    # Fallback to global user
+                    if display_name == "Unknown":
+                        try:
+                            user = await bot.fetch_user(int(user_id))
+                            display_name = user.name if user else "Unknown"
+                        except discord.NotFound:
+                            display_name = "Unknown"
 
                     display_name_padded = display_name.ljust(15)
                     tier_padded = tier.ljust(15)
 
                     username_line += display_name_padded
-                    tier_line += f"*{tier_padded}*"  # italic for slightly lighter font
+                    tier_line += f"*{tier_padded}*"
 
                     col_count += 1
                     if col_count >= max_columns:
@@ -109,12 +118,10 @@ class Professions(commands.Cog):
                         tier_line = ""
                         col_count = 0
 
-                # Add remaining users
                 if username_line:
                     table_lines.append(username_line)
                     table_lines.append(tier_line)
 
-                # Add field to filled_embed
                 filled_embed.add_field(
                     name=f"{profession_icons.get(profession,'')} {profession}",
                     value=f"```{chr(10).join(table_lines)}```",
