@@ -37,7 +37,7 @@ class Professions(commands.Cog):
 
     # ----- Format Registry -----
     async def format_artisan_registry(self, bot: commands.Bot) -> discord.Embed:
-        """Return an embed showing all users and their professions, grouped by type."""
+        """Return an embed showing all users and their professions, grouped by type in a compact column-style layout."""
         embed = discord.Embed(title="Current Professions", color=discord.Color.blurple())
 
         profession_icons = {
@@ -48,17 +48,17 @@ class Professions(commands.Cog):
             "Leatherworking": "👢", "Scribing": "📜", "Tailoring": "🧶", "Weapon Smithing": "⚔️",
         }
 
-        # Define categories
         categories = {
             "Gatherers": ["Fishing", "Herbalism", "Hunting", "Lumberjacking", "Mining"],
             "Processors": ["Alchemy", "Animal Husbandry", "Cooking", "Farming", "Lumber Milling",
-                           "Metalworking", "Stonemasonry", "Tanning", "Weaving"],
+                        "Metalworking", "Stonemasonry", "Tanning", "Weaving"],
             "Crafters": ["Arcane Engineering", "Armor Smithing", "Carpentry", "Jewelry",
-                         "Leatherworking", "Scribing", "Tailoring", "Weapon Smithing"],
+                        "Leatherworking", "Scribing", "Tailoring", "Weapon Smithing"],
         }
 
-        # Loop through each category
         for category_name, professions in categories.items():
+            category_text = ""
+            # Build profession/member lines
             for profession in professions:
                 members = self.artisan_registry.get(profession, {})
                 member_list = []
@@ -67,18 +67,17 @@ class Professions(commands.Cog):
                     member_list.append("- Empty -")
                 else:
                     for user_id, tier in members.items():
-                        user = bot.get_user(int(user_id))  # no await needed
-                        if user:
-                            member_list.append(f"{str(user)} ({tier})")
-                        else:
+                        try:
+                            user = await bot.fetch_user(int(user_id))  # fetch to get username#discriminator
+                            member_list.append(f"{user.name}#{user.discriminator} ({tier})")
+                        except discord.NotFound:
                             member_list.append(f"Unknown User ({tier})")
 
                 icon = profession_icons.get(profession, "")
-                embed.add_field(
-                    name=f"{category_name} — {icon} {profession}",
-                    value="\n".join(member_list),
-                    inline=False
-                )
+                # Add profession and members in one line
+                category_text += f"{icon} **{profession}:** " + ", ".join(member_list) + "\n"
+
+            embed.add_field(name=category_name, value=category_text, inline=False)
 
         return embed
 
