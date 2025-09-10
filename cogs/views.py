@@ -6,7 +6,7 @@ from .recipes import Recipes, RecipesMainView
 # Home View (Main Menu)
 # ------------------------------------------------------
 class HomeView(discord.ui.View):
-    def __init__(self, professions_cog, recipes_cog):
+    def __init__(self, professions_cog: "Professions", recipes_cog: "Recipes"):
         super().__init__(timeout=None)
         self.professions_cog = professions_cog
         self.recipes_cog = recipes_cog
@@ -35,7 +35,6 @@ class HomeView(discord.ui.View):
             ephemeral=True
         )
 
-
 # ------------------------------------------------------
 # Tier Selection View
 # ------------------------------------------------------
@@ -54,7 +53,8 @@ class TierSelectView(discord.ui.View):
                 discord.SelectOption(label="Journeyman", description="Skilled worker", value="3"),
                 discord.SelectOption(label="Master", description="Expert level", value="4"),
                 discord.SelectOption(label="Grandmaster", description="The very best", value="5"),
-            ]
+            ],
+            custom_id=f"tier_select_{profession.lower()}"
         )
         select.callback = self.select_tier
         self.add_item(select)
@@ -84,7 +84,11 @@ class AddGathererView(discord.ui.View):
         self.add_item(self._create_back_button())
 
     def _create_profession_button(self, label):
-        btn = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)
+        btn = discord.ui.Button(
+            label=label,
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"gather_{label.lower()}"
+        )
 
         async def callback(interaction: discord.Interaction):
             await interaction.response.send_message(
@@ -97,7 +101,11 @@ class AddGathererView(discord.ui.View):
         return btn
 
     def _create_back_button(self):
-        btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.danger)
+        btn = discord.ui.Button(
+            label="Back",
+            style=discord.ButtonStyle.danger,
+            custom_id="gather_back"
+        )
 
         async def back_callback(interaction: discord.Interaction):
             await interaction.response.edit_message(
@@ -120,8 +128,9 @@ class AddProcessingView(discord.ui.View):
 
     def _setup_buttons(self):
         buttons = [
-            "Stonemasonry", "Tanning", "Weaving", "Metalworking", "Farming",
-            "Lumber Milling", "Alchemy", "Animal Husbandry", "Cooking"
+            "Stonemasonry", "Tanning", "Weaving", "Metalworking",
+            "Farming", "Lumber Milling", "Alchemy",
+            "Animal Husbandry", "Cooking"
         ]
         for prof in buttons:
             self.add_item(self._create_profession_button(prof))
@@ -129,7 +138,11 @@ class AddProcessingView(discord.ui.View):
         self.add_item(self._create_back_button())
 
     def _create_profession_button(self, label):
-        btn = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)
+        btn = discord.ui.Button(
+            label=label,
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"process_{label.lower().replace(' ', '_')}"
+        )
 
         async def callback(interaction: discord.Interaction):
             await interaction.response.send_message(
@@ -142,7 +155,11 @@ class AddProcessingView(discord.ui.View):
         return btn
 
     def _create_back_button(self):
-        btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.danger)
+        btn = discord.ui.Button(
+            label="Back",
+            style=discord.ButtonStyle.danger,
+            custom_id="process_back"
+        )
 
         async def back_callback(interaction: discord.Interaction):
             await interaction.response.edit_message(
@@ -174,7 +191,11 @@ class AddCraftingView(discord.ui.View):
         self.add_item(self._create_back_button())
 
     def _create_profession_button(self, label):
-        btn = discord.ui.Button(label=label, style=discord.ButtonStyle.secondary)
+        btn = discord.ui.Button(
+            label=label,
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"craft_{label.lower().replace(' ', '_')}"
+        )
 
         async def callback(interaction: discord.Interaction):
             await interaction.response.send_message(
@@ -187,7 +208,11 @@ class AddCraftingView(discord.ui.View):
         return btn
 
     def _create_back_button(self):
-        btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.danger)
+        btn = discord.ui.Button(
+            label="Back",
+            style=discord.ButtonStyle.danger,
+            custom_id="craft_back"
+        )
 
         async def back_callback(interaction: discord.Interaction):
             await interaction.response.edit_message(
@@ -207,7 +232,11 @@ class AddArtisanView(discord.ui.View):
         self.professions_cog = professions_cog
         self.recipes_cog = recipes_cog
 
-    @discord.ui.button(label="Gathering Professions", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(
+        label="Gathering Professions",
+        style=discord.ButtonStyle.secondary,
+        custom_id="artisan_gathering"
+    )
     async def gathering(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
             "Gathering Menu:",
@@ -215,7 +244,11 @@ class AddArtisanView(discord.ui.View):
             ephemeral=True
         )
 
-    @discord.ui.button(label="Processing Professions", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(
+        label="Processing Professions",
+        style=discord.ButtonStyle.secondary,
+        custom_id="artisan_processing"
+    )
     async def processing(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
             "Processing Menu:",
@@ -223,7 +256,11 @@ class AddArtisanView(discord.ui.View):
             ephemeral=True
         )
 
-    @discord.ui.button(label="Crafting Professions", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(
+        label="Crafting Professions",
+        style=discord.ButtonStyle.secondary,
+        custom_id="artisan_crafting"
+    )
     async def crafting(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
             "Crafting Menu:",
@@ -231,7 +268,11 @@ class AddArtisanView(discord.ui.View):
             ephemeral=True
         )
 
-    @discord.ui.button(label="View Current Professions", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(
+        label="View Current Professions",
+        style=discord.ButtonStyle.secondary,
+        custom_id="artisan_view_current"
+    )
     async def view_current(self, interaction: discord.Interaction, button: discord.ui.Button):
         guild_id = interaction.guild.id if interaction.guild else None
         embeds = await self.professions_cog.format_artisan_registry(
@@ -240,7 +281,11 @@ class AddArtisanView(discord.ui.View):
         )
         await interaction.response.send_message(embeds=embeds, ephemeral=True)
 
-    @discord.ui.button(label="Back", style=discord.ButtonStyle.danger)
+    @discord.ui.button(
+        label="Back",
+        style=discord.ButtonStyle.danger,
+        custom_id="artisan_back"
+    )
     async def go_back(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.edit_message(
             content="Back to home:",
