@@ -1,16 +1,14 @@
 import discord
 from .professions import Professions
 from .recipes import Recipes, RecipesMainView
-import discord
 
 # ----- Home View -----
 class HomeView(discord.ui.View):
-    def __init__(self, professions_cog: "Professions", recipes_cog: "Recipes"):
+    def __init__(self, professions_cog: Professions, recipes_cog: Recipes):
         super().__init__(timeout=None)
         self.professions_cog = professions_cog
         self.recipes_cog = recipes_cog
 
-    # Add this button for Artisan menu
     @discord.ui.button(label="Artisan", style=discord.ButtonStyle.primary)
     async def artisan_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(
@@ -28,10 +26,9 @@ class HomeView(discord.ui.View):
         )
 
 
-
 # ----- Tier Select View -----
 class TierSelectView(discord.ui.View):
-    def __init__(self, professions_cog: "Professions", user_id, profession):
+    def __init__(self, professions_cog: Professions, user_id: int, profession: str):
         super().__init__(timeout=None)
         self.professions_cog = professions_cog
         self.user_id = user_id
@@ -53,6 +50,7 @@ class TierSelectView(discord.ui.View):
         await interaction.response.send_message(
             f"✅ You are now **Tier {tier} {self.profession}**!", ephemeral=True
         )
+
 
 # ----- Gathering Professions -----
 class AddGathererView(discord.ui.View):
@@ -108,6 +106,7 @@ class AddGathererView(discord.ui.View):
             view=HomeView(self.professions_cog, self.recipes_cog)
         )
 
+
 # ----- Processing Professions -----
 class AddProcessingView(discord.ui.View):
     def __init__(self, professions_cog, recipes_cog):
@@ -122,39 +121,26 @@ class AddProcessingView(discord.ui.View):
 
     def add_buttons(self):
         for prof in self.buttons:
-            self.add_item(self.create_prof_button(prof))  # just this line
+            async def callback(interaction: discord.Interaction, prof=prof):
+                await interaction.response.send_message(
+                    f"Select your {prof} tier:",
+                    view=TierSelectView(self.professions_cog, interaction.user.id, prof),
+                    ephemeral=True
+                )
+            btn = discord.ui.Button(label=prof, style=discord.ButtonStyle.secondary)
+            btn.callback = callback
+            self.add_item(btn)
 
         # Back button
+        back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary)
         async def back_callback(interaction: discord.Interaction):
             await interaction.response.edit_message(
                 content="Back to home:",
                 view=HomeView(self.professions_cog, self.recipes_cog)
             )
-        back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary)
         back_btn.callback = back_callback
         self.add_item(back_btn)
 
-
-    def create_prof_button(self, prof):
-        async def callback(interaction: discord.Interaction):
-            await interaction.response.send_message(
-                f"Select your {prof} tier:",
-                view=TierSelectView(self.professions_cog, interaction.user.id, prof),
-                ephemeral=True
-            )
-        btn = discord.ui.Button(label=prof, style=discord.ButtonStyle.secondary)
-        btn.callback = callback
-        return btn
-
-        # Back button
-        async def back_callback(interaction: discord.Interaction):
-            await interaction.response.edit_message(
-                content="Back to home:",
-                view=HomeView(self.professions_cog, self.recipes_cog)
-            )
-        back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary)
-        back_btn.callback = back_callback
-        self.add_item(back_btn)
 
 # ----- Crafting Professions -----
 class AddCraftingView(discord.ui.View):
@@ -170,7 +156,7 @@ class AddCraftingView(discord.ui.View):
 
     def add_buttons(self):
         for prof in self.buttons:
-            async def callback(interaction: discord.Interaction, button: discord.ui.Button, prof=prof):
+            async def callback(interaction: discord.Interaction, prof=prof):
                 await interaction.response.send_message(
                     f"Select your {prof} tier:",
                     view=TierSelectView(self.professions_cog, interaction.user.id, prof),
@@ -181,14 +167,15 @@ class AddCraftingView(discord.ui.View):
             self.add_item(btn)
 
         # Back button
+        back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary)
         async def back_callback(interaction: discord.Interaction):
             await interaction.response.edit_message(
                 content="Back to home:",
                 view=HomeView(self.professions_cog, self.recipes_cog)
             )
-        back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary)
         back_btn.callback = back_callback
         self.add_item(back_btn)
+
 
 # ----- Main Add Artisan Menu -----
 class AddArtisanView(discord.ui.View):
@@ -233,4 +220,3 @@ class AddArtisanView(discord.ui.View):
             content="Back to home:",
             view=HomeView(self.professions_cog, self.recipes_cog)
         )
-
