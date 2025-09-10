@@ -1,4 +1,3 @@
-# recipes.py
 import discord
 from discord.ext import commands
 from discord.ui import View, Button, Select, Modal, TextInput
@@ -8,7 +7,7 @@ import os
 PORTFOLIO_FILE = "portfolios.json"
 
 # ---------------------------
-# ----- Profession Select View -----
+# Profession Select View
 # ---------------------------
 class ProfessionSelectView(View):
     def __init__(self, recipes_cog, user_id, next_view_class, **kwargs):
@@ -24,73 +23,79 @@ class ProfessionSelectView(View):
         if not user_professions:
             self.add_item(Button(label="No professions found", disabled=True))
         else:
-            options = [discord.SelectOption(label=prof, value=prof) for prof in user_professions]
-            self.add_item(Select(
+            select = Select(
                 placeholder="Select a profession...",
-                options=options,
-                custom_id="select_profession"
-            ))
+                options=[discord.SelectOption(label=prof, value=prof) for prof in user_professions]
+            )
+            select.callback = self.select_profession
+            self.add_item(select)
 
-    @discord.ui.select(custom_id="select_profession")
-    async def select_profession(self, interaction: discord.Interaction, select: Select):
-        profession = select.values[0]
-        view = self.next_view_class(self.recipes_cog, user_id=self.user_id, profession=profession, **self.next_view_kwargs)
+    async def select_profession(self, interaction: discord.Interaction):
+        profession = interaction.data['values'][0]
+        view = self.next_view_class(
+            self.recipes_cog,
+            user_id=self.user_id,
+            profession=profession,
+            **self.next_view_kwargs
+        )
         await interaction.response.edit_message(
             content=f"Showing recipes for **{profession}**:",
             view=view
         )
 
-
 # ---------------------------
-# ----- Recipes Main View -----
+# Recipes Main View
 # ---------------------------
 class RecipesMainView(View):
     def __init__(self, recipes_cog):
         super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
 
-        self.add_item(Select(
+        select = Select(
             placeholder="Choose an option...",
             options=[
                 discord.SelectOption(label="Learn Recipe", value="learn"),
                 discord.SelectOption(label="All Recipes", value="all"),
                 discord.SelectOption(label="Learned Recipes", value="learned"),
                 discord.SelectOption(label="Search Recipes", value="search"),
-            ],
-            custom_id="main_select"
-        ))
+            ]
+        )
+        select.callback = self.select_option
+        self.add_item(select)
 
-    @discord.ui.select(custom_id="main_select")
-    async def select_option(self, interaction: discord.Interaction, select: Select):
-        choice = select.values[0]
+    async def select_option(self, interaction: discord.Interaction):
+        choice = interaction.data['values'][0]
+        user_id = interaction.user.id
 
         if choice == "learn":
-            if not self.recipes_cog.user_has_profession(interaction.user.id):
-                await interaction.response.send_message("You must have a profession to learn recipes.", ephemeral=True)
+            if not self.recipes_cog.user_has_profession(user_id):
+                await interaction.response.send_message(
+                    "You must have a profession to learn recipes.",
+                    ephemeral=True
+                )
                 return
             await interaction.response.edit_message(
                 content="Select a profession first:",
-                view=ProfessionSelectView(self.recipes_cog, interaction.user.id, RecipeListView)
+                view=ProfessionSelectView(self.recipes_cog, user_id, RecipeListView)
             )
 
         elif choice == "all":
             await interaction.response.edit_message(
                 content="Select a profession first:",
-                view=ProfessionSelectView(self.recipes_cog, interaction.user.id, AllRecipesView)
+                view=ProfessionSelectView(self.recipes_cog, user_id, AllRecipesView)
             )
 
         elif choice == "learned":
             await interaction.response.edit_message(
                 content="Select a profession first:",
-                view=ProfessionSelectView(self.recipes_cog, interaction.user.id, UserPortfolioView)
+                view=ProfessionSelectView(self.recipes_cog, user_id, UserPortfolioView)
             )
 
         elif choice == "search":
-            await interaction.response.send_modal(SearchRecipeModal(self.recipes_cog, interaction.user.id))
-
+            await interaction.response.send_modal(SearchRecipeModal(self.recipes_cog, user_id))
 
 # ---------------------------
-# ----- Search Modal -------
+# Search Modal
 # ---------------------------
 class SearchRecipeModal(Modal):
     def __init__(self, recipes_cog, user_id, profession=None):
@@ -102,11 +107,13 @@ class SearchRecipeModal(Modal):
 
     async def on_submit(self, interaction: discord.Interaction):
         query = self.children[0].value.lower()
-        results = [r for r in self.recipes_cog.get_all_recipes()
-                   if query in r["name"].lower() and (not self.profession or r["profession"] == self.profession)]
+        results = [
+            r for r in self.recipes_cog.get_all_recipes()
+            if query in r["name"].lower() and (not self.profession or r["profession"] == self.profession)
+        ]
 
         if not results:
-            await interaction.response.send_message("No recipes found matching your query.", ephemeral=True)
+            await interaction.response.send_message("No recipes found.", ephemeral=True)
             return
 
         message_text = f"Found {len(results)} recipe(s). Showing {min(10, len(results))} per page:"
@@ -116,9 +123,8 @@ class SearchRecipeModal(Modal):
             ephemeral=True
         )
 
-
 # ---------------------------
-# ----- Recipe List View ----
+# Recipe List View
 # ---------------------------
 class RecipeListView(View):
     def __init__(self, recipes_cog, user_id, recipes=None, page=0, per_page=10, profession=None):
@@ -136,6 +142,7 @@ class RecipeListView(View):
         self.clear_items()
         start = self.page * self.per_page
         end = start + self.per_page
+
         for recipe in self.recipes[start:end]:
             label = f"{recipe['name']} ({recipe['profession']} L{recipe['level']})"
             self.add_item(RecipeButton(self.recipes_cog, self.user_id, recipe, label))
@@ -146,9 +153,8 @@ class RecipeListView(View):
             self.add_item(NextPageButton(self))
         self.add_item(BackToMainButton(self.recipes_cog))
 
-
 # ---------------------------
-# ----- Recipe Buttons -----
+# Recipe Button
 # ---------------------------
 class RecipeButton(Button):
     def __init__(self, recipes_cog, user_id, recipe, label):
@@ -158,16 +164,15 @@ class RecipeButton(Button):
         self.recipe = recipe
 
     async def callback(self, interaction: discord.Interaction):
-        try:
-            await interaction.response.send_message(
-                f"Do you want to learn **{self.recipe['name']}**?",
-                view=ConfirmLearnView(self.recipes_cog, self.user_id, self.recipe),
-                ephemeral=True
-            )
-        except Exception as e:
-            await interaction.followup.send(f"Error: {e}", ephemeral=True)
+        await interaction.response.send_message(
+            f"Do you want to learn **{self.recipe['name']}**?",
+            view=ConfirmLearnView(self.recipes_cog, self.user_id, self.recipe),
+            ephemeral=True
+        )
 
-
+# ---------------------------
+# Confirm Learn View
+# ---------------------------
 class ConfirmLearnView(View):
     def __init__(self, recipes_cog, user_id, recipe):
         super().__init__(timeout=None)
@@ -178,15 +183,20 @@ class ConfirmLearnView(View):
     @discord.ui.button(label="✅ Confirm", style=discord.ButtonStyle.success)
     async def confirm(self, interaction: discord.Interaction, button: Button):
         self.recipes_cog.learn_recipe(self.user_id, self.recipe)
-        await interaction.response.edit_message(content=f"✅ You learned **{self.recipe['name']}**!", view=None)
+        await interaction.response.edit_message(
+            content=f"✅ You learned **{self.recipe['name']}**!",
+            view=None
+        )
 
     @discord.ui.button(label="❌ Cancel", style=discord.ButtonStyle.danger)
     async def cancel(self, interaction: discord.Interaction, button: Button):
-        await interaction.response.edit_message(content="Cancelled learning recipe.", view=None)
-
+        await interaction.response.edit_message(
+            content="Cancelled learning recipe.",
+            view=None
+        )
 
 # ---------------------------
-# ----- Pagination -----
+# Pagination Buttons
 # ---------------------------
 class PrevPageButton(Button):
     def __init__(self, view):
@@ -198,7 +208,6 @@ class PrevPageButton(Button):
         self.view_ref.update_buttons()
         await interaction.response.edit_message(view=self.view_ref)
 
-
 class NextPageButton(Button):
     def __init__(self, view):
         super().__init__(label="Next", style=discord.ButtonStyle.secondary)
@@ -208,7 +217,6 @@ class NextPageButton(Button):
         self.view_ref.page += 1
         self.view_ref.update_buttons()
         await interaction.response.edit_message(view=self.view_ref)
-
 
 class BackToMainButton(Button):
     def __init__(self, recipes_cog):
@@ -221,9 +229,8 @@ class BackToMainButton(Button):
             view=RecipesMainView(self.recipes_cog)
         )
 
-
 # ---------------------------
-# ----- User Portfolio -----
+# User Portfolio View
 # ---------------------------
 class UserPortfolioView(View):
     def __init__(self, recipes_cog, user_id=None, profession=None, **kwargs):
@@ -236,7 +243,6 @@ class UserPortfolioView(View):
             for uid, name in self.users.items():
                 self.add_item(UserButton(self.recipes_cog, uid, name))
 
-
 class UserButton(Button):
     def __init__(self, recipes_cog, user_id, name):
         super().__init__(label=name, style=discord.ButtonStyle.secondary)
@@ -244,22 +250,28 @@ class UserButton(Button):
         self.user_id = user_id
 
     async def callback(self, interaction: discord.Interaction):
-        try:
-            portfolio = self.recipes_cog.get_portfolio(self.user_id)
-            embed = discord.Embed(title=f"{interaction.user.display_name}'s Portfolio", color=discord.Color.blue())
-            for recipe in portfolio:
-                embed.add_field(
-                    name=recipe['name'],
-                    value=f"{recipe['profession']} L{recipe['level']} - [Link]({recipe['url']})",
-                    inline=False
-                )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message(f"Error: {e}", ephemeral=True)
+        portfolio = self.recipes_cog.get_portfolio(self.user_id)
+        if not portfolio:
+            await interaction.response.send_message(
+                "No recipes learned yet.",
+                ephemeral=True
+            )
+            return
 
+        embed = discord.Embed(
+            title=f"{interaction.user.display_name}'s Portfolio",
+            color=discord.Color.blue()
+        )
+        for recipe in portfolio:
+            embed.add_field(
+                name=recipe['name'],
+                value=f"{recipe['profession']} L{recipe['level']} - [Link]({recipe['url']})",
+                inline=False
+            )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # ---------------------------
-# ----- All Recipes View -----
+# All Recipes View
 # ---------------------------
 class AllRecipesView(View):
     def __init__(self, recipes_cog, user_id, profession=None):
@@ -290,7 +302,6 @@ class AllRecipesView(View):
 
         self.add_item(BackToMainButton(self.recipes_cog))
 
-
 class RecipeButtonColored(Button):
     def __init__(self, recipes_cog, user_id, recipe, label, style):
         super().__init__(label=label, style=style)
@@ -307,9 +318,8 @@ class RecipeButtonColored(Button):
         embed.add_field(name="Link", value=f"[View Recipe]({self.recipe['url']})", inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-
 # ---------------------------
-# ----- Recipes Cog -----
+# Recipes Cog
 # ---------------------------
 class Recipes(commands.Cog):
     def __init__(self, bot):
@@ -331,9 +341,7 @@ class Recipes(commands.Cog):
 
     def user_has_profession(self, user_id):
         professions_cog = self.bot.get_cog("Professions")
-        if not professions_cog:
-            return False
-        return bool(professions_cog.get_user_professions(user_id))
+        return bool(professions_cog and professions_cog.get_user_professions(user_id))
 
     def has_learned(self, user_id, recipe_name):
         return any(r['name'] == recipe_name for r in self.user_portfolios.get(str(user_id), []))
@@ -365,7 +373,6 @@ class Recipes(commands.Cog):
     def save_portfolios(self):
         with open(PORTFOLIO_FILE, "w", encoding="utf-8") as f:
             json.dump(self.user_portfolios, f, ensure_ascii=False, indent=4)
-
 
 async def setup(bot):
     await bot.add_cog(Recipes(bot))
