@@ -1,18 +1,20 @@
-import discord
-from discord.ext import commands
 import os
 import asyncio
 import logging
-from dotenv import load_dotenv
+import discord
+from discord.ext import commands
 from cogs.views import HomeView
 
 # ------------------------------------------------------
-# Load Environment Variables
+# Load Token from Environment (Railway handles this)
 # ------------------------------------------------------
-load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
+
 if not TOKEN:
-    raise RuntimeError("❌ DISCORD_TOKEN is missing! Add it to your .env or Railway variables.")
+    raise RuntimeError(
+        "❌ DISCORD_TOKEN is missing! "
+        "Set it in Railway → Variables before deploying."
+    )
 
 # ------------------------------------------------------
 # Logging Setup
@@ -21,7 +23,10 @@ LOG_LEVEL = logging.INFO
 logger = logging.getLogger("AshesBot")
 logger.setLevel(LOG_LEVEL)
 console_handler = logging.StreamHandler()
-console_handler.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] | %(message)s", "%Y-%m-%d %H:%M:%S"))
+console_handler.setFormatter(logging.Formatter(
+    "[%(asctime)s] [%(levelname)s] | %(message)s",
+    "%Y-%m-%d %H:%M:%S"
+))
 logger.addHandler(console_handler)
 
 # ------------------------------------------------------
@@ -36,15 +41,16 @@ class AshesBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        """Load cogs and sync slash commands automatically."""
+        """Load cogs, add persistent views, and sync commands."""
         await load_cogs(self)
-        # Persistent Home View for buttons
+
+        # Register persistent HomeView
         professions_cog = self.get_cog("Professions")
         recipes_cog = self.get_cog("Recipes")
         if professions_cog and recipes_cog:
             self.add_view(HomeView(professions_cog, recipes_cog))
 
-        # Sync slash commands only ONCE
+        # Sync slash commands globally
         synced = await self.tree.sync()
         logger.info(f"🌐 Synced {len(synced)} slash commands globally.")
 
@@ -72,19 +78,28 @@ async def home(interaction: discord.Interaction):
     recipes_cog = bot.get_cog("Recipes")
 
     if not professions_cog or not recipes_cog:
-        await interaction.response.send_message("⚠️ Required cogs are missing.", ephemeral=True)
+        await interaction.response.send_message(
+            "⚠️ Required cogs are missing.", ephemeral=True
+        )
         return
 
     try:
-        # Send Guild Home View as DM
+        # Send Home Menu via DM
         dm_channel = await interaction.user.create_dm()
-        await dm_channel.send("🏠 Welcome to your Guild Home!", view=HomeView(professions_cog, recipes_cog))
-        await interaction.response.send_message("📩 I've sent you a DM with your home menu!", ephemeral=True)
+        await dm_channel.send(
+            "🏠 Welcome to your Guild Home!",
+            view=HomeView(professions_cog, recipes_cog)
+        )
+        await interaction.response.send_message(
+            "📩 I've sent you a DM with your home menu!", ephemeral=True
+        )
     except discord.Forbidden:
-        await interaction.response.send_message("⚠️ I can't DM you. Please enable DMs.", ephemeral=True)
+        await interaction.response.send_message(
+            "⚠️ I can't DM you. Please enable DMs.", ephemeral=True
+        )
 
 # ------------------------------------------------------
-# Debug Slash Command
+# Debug Command
 # ------------------------------------------------------
 if not any(cmd.name == "debug-recipes" for cmd in bot.tree.get_commands()):
     @bot.tree.command(name="debug-recipes", description="Debug the recipes system")
@@ -92,8 +107,16 @@ if not any(cmd.name == "debug-recipes" for cmd in bot.tree.get_commands()):
         cogs = list(bot.cogs.keys())
         commands_list = [cmd.name for cmd in bot.tree.get_commands()]
         embed = discord.Embed(title="🔍 Debug Info", color=discord.Color.blue())
-        embed.add_field(name="Loaded Cogs", value=", ".join(cogs) or "⚠️ None", inline=False)
-        embed.add_field(name="Slash Commands", value=", ".join(commands_list) or "⚠️ None", inline=False)
+        embed.add_field(
+            name="Loaded Cogs",
+            value=", ".join(cogs) or "⚠️ None",
+            inline=False
+        )
+        embed.add_field(
+            name="Slash Commands",
+            value=", ".join(commands_list) or "⚠️ None",
+            inline=False
+        )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # ------------------------------------------------------
