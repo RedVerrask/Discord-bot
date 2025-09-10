@@ -11,7 +11,7 @@ PORTFOLIO_FILE = "portfolios.json"
 # ---------------------------
 # ----- Recipe Views --------
 # ---------------------------
-class ProfessionSelectView(discord.ui.View):
+class ProfessionSelectView(View):
     def __init__(self, recipes_cog, user_id, next_view_class, **kwargs):
         super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
@@ -23,21 +23,21 @@ class ProfessionSelectView(discord.ui.View):
         user_professions = professions_cog.get_user_professions(user_id) if professions_cog else []
 
         if not user_professions:
-            self.add_item(discord.ui.Button(label="No professions found", disabled=True))
+            self.add_item(Button(label="No professions found", disabled=True))
         else:
             options = [discord.SelectOption(label=prof, value=prof) for prof in user_professions]
-            self.add_item(discord.ui.Select(
+            self.add_item(Select(
                 placeholder="Select a profession...",
                 options=options,
                 custom_id="select_profession"
             ))
 
     @discord.ui.select(custom_id="select_profession")
-    async def select_profession(self, interaction: discord.Interaction, select: discord.ui.Select):
+    async def select_profession(self, interaction: discord.Interaction, select: Select):
         profession = select.values[0]
 
-        # Create the next view (e.g., RecipeListView) filtered by this profession
-        view = self.next_view_class(self.recipes_cog, self.user_id, profession=profession, **self.next_view_kwargs)
+        # Instantiate the next view, compatible with user_id/profession
+        view = self.next_view_class(self.recipes_cog, user_id=self.user_id, profession=profession, **self.next_view_kwargs)
         await interaction.response.edit_message(
             content=f"Showing recipes for **{profession}**:",
             view=view
@@ -49,50 +49,49 @@ class ProfessionSelectView(discord.ui.View):
 
 
 
-class RecipesMainView(discord.ui.View):
+class RecipesMainView(View):
     def __init__(self, recipes_cog):
         super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
 
-    @discord.ui.select(
-        placeholder="Choose an option...",
-        options=[
-            discord.SelectOption(label="Learn Recipe", value="learn"),
-            discord.SelectOption(label="All Recipes", value="all"),
-            discord.SelectOption(label="Learned Recipes", value="learned"),
-            discord.SelectOption(label="Search Recipes", value="search"),
-        ]
-    )
-    async def select_option(self, interaction: discord.Interaction, select: discord.ui.Select):
+        self.add_item(Select(placeholder="Choose an option...",
+            options=[
+                discord.SelectOption(label="Learn Recipe", value="learn"),
+                discord.SelectOption(label="All Recipes", value="all"),
+                discord.SelectOption(label="Learned Recipes", value="learned"),
+                discord.SelectOption(label="Search Recipes", value="search"),
+            ],
+            custom_id="main_select"
+        ))
+
+    @discord.ui.select(custom_id="main_select")
+    async def select_option(self, interaction: discord.Interaction, select: Select):
         choice = select.values[0]
-        
+
         if choice == "learn":
             if not self.recipes_cog.user_has_profession(interaction.user.id):
                 await interaction.response.send_message("You must have a profession to learn recipes.", ephemeral=True)
                 return
-            # Instead of opening RecipeListView directly, open ProfessionSelectView
-            await interaction.response.send_message(
-                "Select a profession first:",
-                view=ProfessionSelectView(self.recipes_cog, interaction.user.id, RecipeListView),
-                ephemeral=True
+            await interaction.response.edit_message(
+                content="Select a profession first:",
+                view=ProfessionSelectView(self.recipes_cog, interaction.user.id, RecipeListView)
             )
 
         elif choice == "all":
-            await interaction.response.send_message(
-                "Select a profession first:",
-                view=ProfessionSelectView(self.recipes_cog, interaction.user.id, AllRecipesView),
-                ephemeral=True
+            await interaction.response.edit_message(
+                content="Select a profession first:",
+                view=ProfessionSelectView(self.recipes_cog, interaction.user.id, AllRecipesView)
             )
 
         elif choice == "learned":
-            await interaction.response.send_message(
-                "Select a profession first:",
-                view=ProfessionSelectView(self.recipes_cog, interaction.user.id, UserPortfolioView),
-                ephemeral=True
+            await interaction.response.edit_message(
+                content="Select a profession first:",
+                view=ProfessionSelectView(self.recipes_cog, interaction.user.id, UserPortfolioView)
             )
 
         elif choice == "search":
             await interaction.response.send_modal(SearchRecipeModal(self.recipes_cog, interaction.user.id))
+
 
 
 
@@ -229,24 +228,26 @@ class BackToMainButton(Button):
         self.recipes_cog = recipes_cog
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.edit_message(content="Recipes Menu:", view=RecipesMainView(self.recipes_cog))
-
+        await interaction.response.edit_message(
+            content="Recipes Menu:",
+            view=RecipesMainView(self.recipes_cog)
+        )
 
 # ---------------------------
 # ----- User Portfolio View --
 # ---------------------------
 
 class UserPortfolioView(View):
-    def __init__(self, recipes_cog, profession=None):
+    def __init__(self, recipes_cog, user_id=None, profession=None, **kwargs):
         super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
         self.users = self.recipes_cog.get_users_with_portfolio()
         if not self.users:
-            # If no portfolios exist, show a disabled button or a message
             self.add_item(Button(label="No users found", disabled=True))
         else:
-            for user_id, name in self.users.items():
-                self.add_item(UserButton(self.recipes_cog, user_id, name))
+            for uid, name in self.users.items():
+                self.add_item(UserButton(self.recipes_cog, uid, name))
+
 
 
 
