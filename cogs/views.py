@@ -4,20 +4,19 @@ from .professions import Professions
 
 # ----- Home View -----
 class HomeView(discord.ui.View):
-    def __init__(self, professions_cog: "Professions"):  # quotes = forward reference
+    def __init__(self, professions_cog: "Professions", recipes_cog: "Recipes"):
         super().__init__(timeout=None)
         self.professions_cog = professions_cog
-
-    @discord.ui.button(label="Artisan", style=discord.ButtonStyle.secondary)
-    async def artisan_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            "Artisan Menu:", view=AddArtisanView(self.professions_cog), ephemeral=True
-        )
+        self.recipes_cog = recipes_cog  # add this
 
     @discord.ui.button(label="Recipes", style=discord.ButtonStyle.primary)
     async def recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("Recipe Menu:", ephemeral=True)
-
+        # send the Recipes menu using RecipesMainView
+        await interaction.response.send_message(
+            "Recipe Menu:",
+            view=RecipesMainView(self.recipes_cog),
+            ephemeral=True
+        )
 
 # ----- Tier Select View -----
 class TierSelectView(discord.ui.View):

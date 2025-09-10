@@ -35,18 +35,25 @@ async def on_ready():
 
 
 # ----- Home Slash Command -----
-from cogs.views import HomeView
+# bot.py
+from cogs.views import HomeView  # type: ignore
 
 @bot.tree.command(name="home", description="Open your guild home menu")
 async def home(interaction: discord.Interaction):
     professions_cog = bot.get_cog("Professions")
-    if professions_cog is None:
-        await interaction.response.send_message("Professions cog is not loaded yet.", ephemeral=True)
+    recipes_cog = bot.get_cog("Recipes")  # get your recipes cog
+    if professions_cog is None or recipes_cog is None:
+        await interaction.response.send_message(
+            "Required cogs are not loaded yet.", ephemeral=True
+        )
         return
 
     try:
         dm_channel = await interaction.user.create_dm()
-        await dm_channel.send("Welcome to your Guild Home!", view=HomeView(professions_cog))
+        await dm_channel.send(
+            "Welcome to your Guild Home!", 
+            view=HomeView(professions_cog, recipes_cog)  # pass both cogs
+        )
 
         await interaction.response.send_message(
             "I've sent you a DM with your home menu!", ephemeral=True
@@ -55,7 +62,6 @@ async def home(interaction: discord.Interaction):
         await interaction.response.send_message(
             "I couldn't DM you. Please enable DMs.", ephemeral=True
         )
-
 
 # ----- Run Bot -----
 async def main():
