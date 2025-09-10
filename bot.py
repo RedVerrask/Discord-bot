@@ -128,6 +128,73 @@ async def home(interaction: discord.Interaction):
 # ------------------------------------------------------
 # Run Bot
 # ------------------------------------------------------
+from discord import app_commands
+
+# ------------------------------------------------------
+# Hidden Debug Command
+# ------------------------------------------------------
+@bot.tree.command(name="debug", description="Debug bot status")
+@app_commands.checks.has_permissions(administrator=True)
+async def debug(interaction: discord.Interaction):
+    """Shows debug info about the bot, cogs, and views."""
+    professions_cog = bot.get_cog("Professions")
+    recipes_cog = bot.get_cog("Recipes")
+
+    # Check persistent views
+    views_info = []
+    if hasattr(bot, "_views"):
+        for view in bot._views.values():
+            if isinstance(view, discord.ui.View):
+                views_info.append(f"✅ {view.__class__.__name__}")
+    else:
+        views_info.append("⚠️ No views registered")
+
+    # Check buttons/selects missing custom_id
+    invalid_items = []
+    for view in getattr(bot, "_views", {}).values():
+        if isinstance(view, discord.ui.View):
+            for item in view.children:
+                if hasattr(item, "custom_id") and not item.custom_id:
+                    invalid_items.append(f"{item.label or 'Unnamed Item'} ({view.__class__.__name__})")
+
+    # Build debug embed
+    embed = discord.Embed(
+        title="🔍 Bot Debug Information",
+        color=discord.Color.blue()
+    )
+    embed.add_field(name="Bot Status", value="✅ Online", inline=False)
+    embed.add_field(name="Latency", value=f"{round(bot.latency * 1000)}ms", inline=False)
+    embed.add_field(
+        name="Loaded Cogs",
+        value="\n".join(bot.cogs.keys()) or "⚠️ No cogs loaded",
+        inline=False
+    )
+    embed.add_field(
+        name="Persistent Views",
+        value="\n".join(views_info) or "⚠️ No persistent views registered",
+        inline=False
+    )
+    embed.add_field(
+        name="Missing custom_id",
+        value="\n".join(invalid_items) if invalid_items else "✅ All items have custom IDs",
+        inline=False
+    )
+
+    # Professions & Recipes cog status
+    embed.add_field(
+        name="Professions Cog",
+        value="✅ Loaded" if professions_cog else "⚠️ Missing",
+        inline=True
+    )
+    embed.add_field(
+        name="Recipes Cog",
+        value="✅ Loaded" if recipes_cog else "⚠️ Missing",
+        inline=True
+    )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
 async def main():
     async with bot:
         await load_cogs()

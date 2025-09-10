@@ -46,19 +46,114 @@ class ProfessionSelectView(View):
 # ---------------------------
 # Recipes Main View
 # ---------------------------
-class RecipesMainView(View):
+class LearnRecipeOptionsView(discord.ui.View):
+    def __init__(self, recipes_cog, user_id):
+        super().__init__(timeout=None)
+        self.recipes_cog = recipes_cog
+        self.user_id = user_id
+
+    @discord.ui.button(label="📜 Browse Recipes", style=discord.ButtonStyle.primary, custom_id="learn_browse")
+    async def browse(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(
+            content="Select a recipe from your profession:",
+            view=ProfessionSelectView(self.recipes_cog, self.user_id, RecipeListView)
+        )
+
+    @discord.ui.button(label="⌨️ Type Recipe Name", style=discord.ButtonStyle.secondary, custom_id="learn_type")
+    async def type_recipe(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(SearchRecipeModal(self.recipes_cog, self.user_id))
+
+
+class LearnedRecipesUserView(discord.ui.View):
+    def __init__(self, recipes_cog, users_with_recipes):
+        super().__init__(timeout=None)
+        self.recipes_cog = recipes_cog
+        self.users_with_recipes = users_with_recipes
+
+        options = [
+            discord.SelectOption(label=name, value=uid)
+            for uid, name in self.users_with_recipes.items()
+        ]
+
+        select = discord.ui.Select(
+            placeholder="Select a user...",
+            options=options,
+            custom_id="learned_recipes_user_select"
+        )
+        select.callback = self.show_user_recipes
+        self.add_item(select)
+
+    async def show_user_recipes(self, interaction: discord.Interaction):
+        user_id = interaction.data['values'][0]
+        portfolio = self.recipes_cog.get_portfolio(user_id)
+
+        if not portfolio:
+            await interaction.response.send_message("⚠️ This user hasn't learned any recipes yet.", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title=f"📜 Recipes Learned by {self.users_with_recipes[user_id]}",
+            color=discord.Color.green()
+        )
+        for recipe in portfolio:
+            embed.add_field(
+                name=recipe["name"],
+                value=f"{recipe['profession']} L{recipe['level']} - [Link]({recipe['url']})",
+                inline=False
+            )
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+class SearchRecipesView(discord.ui.View):
+    def __init__(self, recipes_cog, user_id):
+        super().__init__(timeout=None)
+        self.recipes_cog = recipes_cog
+        self.user_id = user_id
+
+        professions = sorted(list({r["profession"] for r in self.recipes_cog.get_all_recipes()}))
+        options = [discord.SelectOption(label="All Professions", value="all")] + [
+            discord.SelectOption(label=prof, value=prof) for prof in professions
+        ]
+
+        select = discord.ui.Select(
+            placeholder="Choose a profession...",
+            options=options,
+            custom_id="search_recipes_professions"
+        )
+        select.callback = self.search
+        self.add_item(select)
+
+    async def search(self, interaction: discord.Interaction):
+        profession = interaction.data['values'][0]
+        recipes = self.recipes_cog.get_all_recipes()
+
+        if profession != "all":
+            recipes = [r for r in recipes if r["profession"] == profession]
+
+        if not recipes:
+            await interaction.response.send_message("⚠️ No recipes found.", ephemeral=True)
+            return
+
+        await interaction.response.edit_message(
+            content=f"Showing recipes for **{profession}**" if profession != "all" else "Showing **all recipes**:",
+            view=RecipeListView(self.recipes_cog, self.user_id, recipes=recipes, profession=None if profession == "all" else profession)
+        )
+
+
+class RecipesMainView(discord.ui.View):
     def __init__(self, recipes_cog):
         super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
 
-        select = Select(
+        select = discord.ui.Select(
             placeholder="Choose an option...",
             options=[
                 discord.SelectOption(label="Learn Recipe", value="learn"),
-                discord.SelectOption(label="All Recipes", value="all"),
                 discord.SelectOption(label="Learned Recipes", value="learned"),
-                discord.SelectOption(label="Search Recipes", value="search"),
-            ]
+                discord.SelectOption(label="Search Recipes", value="search"),  # Combined All + Search
+            ],
+            custom_id="recipes_main_menu"
         )
         select.callback = self.select_option
         self.add_item(select)
@@ -67,32 +162,46 @@ class RecipesMainView(View):
         choice = interaction.data['values'][0]
         user_id = interaction.user.id
 
+        # Learn Recipe Option
         if choice == "learn":
             if not self.recipes_cog.user_has_profession(user_id):
                 await interaction.response.send_message(
-                    "You must have a profession to learn recipes.",
+                    "⚠️ You must have a profession to learn recipes.",
                     ephemeral=True
                 )
                 return
-            await interaction.response.edit_message(
-                content="Select a profession first:",
-                view=ProfessionSelectView(self.recipes_cog, user_id, RecipeListView)
+
+            # Dropdown: Type or Browse
+            await interaction.response.send_message(
+                "How would you like to learn a recipe?",
+                view=LearnRecipeOptionsView(self.recipes_cog, user_id),
+                ephemeral=True
             )
 
-        elif choice == "all":
-            await interaction.response.edit_message(
-                content="Select a profession first:",
-                view=ProfessionSelectView(self.recipes_cog, user_id, AllRecipesView)
-            )
-
+        # Learned Recipes Option
         elif choice == "learned":
-            await interaction.response.edit_message(
-                content="Select a profession first:",
-                view=ProfessionSelectView(self.recipes_cog, user_id, UserPortfolioView)
+            users_with_recipes = self.recipes_cog.get_users_with_recipes()
+            if not users_with_recipes:
+                await interaction.response.send_message(
+                    "⚠️ No users have learned recipes yet.",
+                    ephemeral=True
+                )
+                return
+
+            await interaction.response.send_message(
+                "Select a user to view their learned recipes:",
+                view=LearnedRecipesUserView(self.recipes_cog, users_with_recipes),
+                ephemeral=True
             )
 
+        # Search Recipes Option
         elif choice == "search":
-            await interaction.response.send_modal(SearchRecipeModal(self.recipes_cog, user_id))
+            await interaction.response.send_message(
+                "Select a profession to search recipes:",
+                view=SearchRecipesView(self.recipes_cog, user_id),
+                ephemeral=True
+            )
+
 
 # ---------------------------
 # Search Modal
@@ -327,6 +436,14 @@ class Recipes(commands.Cog):
         with open("recipes.json", "r", encoding="utf-8") as f:
             self.recipes_data = json.load(f)
         self.user_portfolios = self.load_portfolios()
+        
+    def get_users_with_recipes(self):
+        users = {}
+        for uid, portfolio in self.user_portfolios.items():
+            if portfolio:  # Only include users with learned recipes
+                member = self.bot.get_user(int(uid))
+                users[uid] = member.display_name if member else f"User {uid}"
+        return users
 
     def get_all_recipes(self):
         recipes_list = self.recipes_data if isinstance(self.recipes_data, list) else self.recipes_data.get("recipes", [])
