@@ -1,7 +1,6 @@
 import discord
 from .professions import Professions
 from .recipes import Recipes, RecipesMainView
-from .artisans import AddArtisanView
 
 # ----- Home View -----
 class HomeView(discord.ui.View):
@@ -26,6 +25,8 @@ class HomeView(discord.ui.View):
             view=RecipesMainView(self.recipes_cog),
             ephemeral=True
         )
+
+
 
 # ----- Tier Select View -----
 class TierSelectView(discord.ui.View):
@@ -120,15 +121,29 @@ class AddProcessingView(discord.ui.View):
 
     def add_buttons(self):
         for prof in self.buttons:
-            async def callback(interaction: discord.Interaction, button: discord.ui.Button, prof=prof):
-                await interaction.response.send_message(
-                    f"Select your {prof} tier:",
-                    view=TierSelectView(self.professions_cog, interaction.user.id, prof),
-                    ephemeral=True
-                )
-            btn = discord.ui.Button(label=prof, style=discord.ButtonStyle.secondary)
-            btn.callback = callback
-            self.add_item(btn)
+            self.add_item(self.create_prof_button(prof))  # just this line
+
+        # Back button
+        async def back_callback(interaction: discord.Interaction):
+            await interaction.response.edit_message(
+                content="Back to home:",
+                view=HomeView(self.professions_cog, self.recipes_cog)
+            )
+        back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary)
+        back_btn.callback = back_callback
+        self.add_item(back_btn)
+
+
+    def create_prof_button(self, prof):
+        async def callback(interaction: discord.Interaction):
+            await interaction.response.send_message(
+                f"Select your {prof} tier:",
+                view=TierSelectView(self.professions_cog, interaction.user.id, prof),
+                ephemeral=True
+            )
+        btn = discord.ui.Button(label=prof, style=discord.ButtonStyle.secondary)
+        btn.callback = callback
+        return btn
 
         # Back button
         async def back_callback(interaction: discord.Interaction):
