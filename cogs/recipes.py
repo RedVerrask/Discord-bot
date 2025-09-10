@@ -136,8 +136,8 @@ class Recipes(commands.Cog):
 # ======================================================
 class RecipeSearchModal(Modal, title="Search Recipes"):
     query = TextInput(
-        label="Recipe name (you bum, smashin my head against the keyboard for this one thing to work)",
-        placeholder="e.g., sword, 2nd sword division, etc",
+        label="Recipe name",
+        placeholder="e.g., sword, oak plank, stew",
         required=True
     )
 
@@ -225,27 +225,25 @@ class RecipesMainView(View):
         if choice == "learn":
             view = View(timeout=None)
 
-            # ✅ Button: Type Recipe Name
+            # ✅ Type Recipe Button
             type_button = discord.ui.Button(
                 label="⌨️ Type Recipe Name",
                 style=discord.ButtonStyle.primary,
                 custom_id="learn_type"
             )
-            async def type_callback(interaction_btn: discord.Interaction):
-                await interaction_btn.response.send_modal(
-                    RecipeSearchModal(self.recipes_cog, user_id)
-                )
+            async def type_callback(btn_inter: discord.Interaction):
+                await btn_inter.response.send_modal(RecipeSearchModal(self.recipes_cog, user_id))
             type_button.callback = type_callback
             view.add_item(type_button)
 
-            # ✅ Button: Browse by Recipe Profession
+            # ✅ Browse by Profession Button
             browse_button = discord.ui.Button(
                 label="📜 Browse by Recipe Profession",
                 style=discord.ButtonStyle.secondary,
                 custom_id="learn_browse_prof"
             )
-            async def browse_callback(interaction_btn: discord.Interaction):
-                await interaction_btn.response.edit_message(
+            async def browse_callback(btn_inter: discord.Interaction):
+                await btn_inter.response.edit_message(
                     content="Select a profession to browse:",
                     view=LearnByProfessionView(self.recipes_cog, user_id),
                     embed=None
@@ -253,14 +251,12 @@ class RecipesMainView(View):
             browse_button.callback = browse_callback
             view.add_item(browse_button)
 
-            # ✅ Send the dynamic view
             await interaction.response.edit_message(
                 content="How would you like to learn a recipe?",
                 view=view,
                 embed=None
             )
             return
-
 
         # --- Search Recipes ---
         if choice == "search":
@@ -276,13 +272,14 @@ class RecipesMainView(View):
 
             view = View(timeout=None)
 
-            @discord.ui.select(
+            user_select = discord.ui.Select(
                 placeholder="Select a user…",
                 options=[discord.SelectOption(label=name, value=uid) for uid, name in users_with_recipes.items()],
                 custom_id="recipes_learned_user"
             )
-            async def _user_pick(sel_inter: discord.Interaction, sel: Select):
-                uid = sel.values[0]
+
+            async def user_select_callback(sel_inter: discord.Interaction):
+                uid = user_select.values[0]
                 portfolio = self.recipes_cog.get_portfolio(uid) or []
                 embed = discord.Embed(
                     title=f"📜 Recipes Learned by {users_with_recipes[uid]}",
@@ -302,7 +299,9 @@ class RecipesMainView(View):
                         embed.set_footer(text=f"And {len(portfolio) - 20} more…")
                 await sel_inter.response.send_message(embed=embed, ephemeral=True)
 
-            view.add_item(_user_pick)  # type: ignore
+            user_select.callback = user_select_callback
+            view.add_item(user_select)
+
             await interaction.response.edit_message(
                 content="Select a user to view their learned recipes:",
                 view=view,
@@ -376,10 +375,11 @@ class RecipeButton(Button):
         self.recipe = recipe
 
     async def callback(self, interaction: discord.Interaction):
-        # Check profession ownership if needed
-        if not self.recipes_cog.user_has_profession(self.user_id):
+        # Require correct profession to learn
+        professions_cog = self.recipes_cog.bot.get_cog("Professions")
+        if not professions_cog or self.recipe["profession"] not in professions_cog.get_user_professions(self.user_id):
             await interaction.response.send_message(
-                "⚠️ You don't have this profession yet!",
+                f"⚠️ You don't have the **{self.recipe['profession']}** profession yet!",
                 ephemeral=True
             )
             return
