@@ -177,7 +177,7 @@ class SearchRecipeModal(Modal):
 # ------------------------------------------------------
 # Search Recipes View
 # ------------------------------------------------------
-class SearchRecipesView(View):
+class SearchRecipesView(discord.ui.View):
     def __init__(self, recipes_cog, user_id):
         super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
@@ -188,28 +188,28 @@ class SearchRecipesView(View):
             discord.SelectOption(label=prof, value=prof) for prof in professions
         ]
 
-        select = discord.ui.Select(
+        self.select = discord.ui.Select(
             placeholder="Choose a profession…",
             options=options,
             custom_id="search_recipes_dropdown"
         )
-        self.add_item(select)
+        self.select.callback = self.search_callback
+        self.add_item(self.select)
 
-        async def search_callback(interaction: discord.Interaction):
-            profession = select.values[0]
-            await interaction.response.send_modal(
-                SmartSearchModal(self.recipes_cog, self.user_id, profession)
-            )
+    async def search_callback(self, interaction: discord.Interaction):
+        """Handles the profession selection and triggers the modal."""
+        profession = self.select.values[0]
+        await interaction.response.send_modal(
+            SmartSearchModal(self.recipes_cog, self.user_id, profession)
+        )
 
-        select.callback = search_callback
-
-class SmartSearchModal(Modal):
+class SmartSearchModal(discord.ui.Modal):
     def __init__(self, recipes_cog, user_id, profession):
         super().__init__(title="🔍 Smart Recipe Search")
         self.recipes_cog = recipes_cog
         self.user_id = user_id
         self.profession = profession
-        self.recipe_input = TextInput(
+        self.recipe_input = discord.ui.TextInput(
             label="Recipe Name (optional)",
             placeholder="Type part of the recipe name or leave blank for all…",
             required=False
@@ -240,6 +240,7 @@ class SmartSearchModal(Modal):
             view=recipe_view,
             ephemeral=True
         )
+
 
 
 
