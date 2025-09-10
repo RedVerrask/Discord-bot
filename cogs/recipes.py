@@ -50,6 +50,19 @@ class ProfessionSelectView(discord.ui.View):
 
 
 class RecipesMainView(discord.ui.View):
+    def __init__(self, recipes_cog):
+        super().__init__(timeout=None)
+        self.recipes_cog = recipes_cog
+
+    @discord.ui.select(
+        placeholder="Choose an option...",
+        options=[
+            discord.SelectOption(label="Learn Recipe", value="learn"),
+            discord.SelectOption(label="All Recipes", value="all"),
+            discord.SelectOption(label="Learned Recipes", value="learned"),
+            discord.SelectOption(label="Search Recipes", value="search"),
+        ]
+    )
     async def select_option(self, interaction: discord.Interaction, select: discord.ui.Select):
         choice = select.values[0]
         
@@ -88,15 +101,17 @@ class RecipesMainView(discord.ui.View):
 # ---------------------------
 
 class SearchRecipeModal(Modal):
-    def __init__(self, recipes_cog, user_id):
+    def __init__(self, recipes_cog, user_id, profession=None):
         super().__init__(title="Search Recipes")
         self.recipes_cog = recipes_cog
         self.user_id = user_id
+        self.profession = profession
         self.add_item(TextInput(label="Enter recipe name", placeholder="Type part of the recipe name here..."))
 
     async def on_submit(self, interaction: discord.Interaction):
         query = self.children[0].value.lower()
-        results = [r for r in self.recipes_cog.get_all_recipes() if query in r["name"].lower()]
+        results = [r for r in self.recipes_cog.get_all_recipes() if query in r["name"].lower() and (not self.profession or r["profession"] == self.profession)]
+
         if not results:
             await interaction.response.send_message("No recipes found matching your query.", ephemeral=True)
             return
@@ -222,7 +237,7 @@ class BackToMainButton(Button):
 # ---------------------------
 
 class UserPortfolioView(View):
-    def __init__(self, recipes_cog):
+    def __init__(self, recipes_cog, profession=None):
         super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
         self.users = self.recipes_cog.get_users_with_portfolio()
@@ -258,14 +273,16 @@ class UserButton(Button):
 # ---------------------------
 
 class AllRecipesView(View):
-    def __init__(self, recipes_cog, user_id):
+    def __init__(self, recipes_cog, user_id, profession=None):
         super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
         self.user_id = user_id
-        self.recipes = self.recipes_cog.get_all_recipes()
         self.page = 0
         self.per_page = 10
+        all_recipes = self.recipes_cog.get_all_recipes()
+        self.recipes = [r for r in all_recipes if (not profession or r["profession"] == profession)]
         self.update_buttons()
+
 
     def update_buttons(self):
         self.clear_items()
