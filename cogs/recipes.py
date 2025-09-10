@@ -263,9 +263,11 @@ class Recipes(commands.Cog):
 
     def user_has_profession(self, user_id):
         professions_cog = self.bot.get_cog("Professions")
-        if professions_cog:
-            return professions_cog.has_profession(user_id)
-        return False
+        if not professions_cog:
+            return False  # Professions cog not loaded
+        # Assuming Professions cog has a method `get_user_professions(user_id)` returning a list
+        user_professions = professions_cog.get_user_professions(user_id)
+        return bool(user_professions)
 
     def has_learned(self, user_id, recipe_name):
         return any(r['name'] == recipe_name for r in self.user_portfolios.get(str(user_id), []))
@@ -281,12 +283,13 @@ class Recipes(commands.Cog):
     def get_users_with_portfolio(self):
         users = {}
         for uid in self.user_portfolios:
-            member = self.bot.get_user(int(uid))
+            member = self.bot.get_user(int(uid))  # fetch Discord User object
             if member:
                 users[uid] = member.display_name
             else:
-                users[uid] = f"User{uid}"
+                users[uid] = f"User{uid}"  # fallback
         return users
+
 
     def get_portfolio(self, user_id):
         return self.user_portfolios.get(str(user_id), [])
