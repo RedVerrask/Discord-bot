@@ -69,18 +69,40 @@ class Professions(commands.Cog):
                     )
                     continue
 
-                # Build username line and tier line
+                # Build table using monospace
+                table_lines = [""]  # start with empty line
+                max_columns = 4  # change this to how many users per line you want
+                col_count = 0
                 username_line = ""
                 tier_line = ""
+
                 for user_id, tier in members.items():
                     user = bot.get_user(int(user_id))
-                    display_name = user.display_name if user else "Unknown User"
-                    username_line += f"{display_name}    "  # spacing for columns
-                    tier_line += f"*{tier}*    "            # italics for lighter color
+                    display_name = user.display_name if user else "Unknown"
+
+                    # pad usernames to same length for alignment
+                    display_name_padded = display_name.ljust(15)
+                    tier_padded = tier.ljust(15)
+
+                    username_line += display_name_padded
+                    tier_line += f"*{tier_padded}*"
+
+                    col_count += 1
+                    if col_count >= max_columns:
+                        table_lines.append(username_line)
+                        table_lines.append(tier_line)
+                        username_line = ""
+                        tier_line = ""
+                        col_count = 0
+
+                # Add remaining users if any
+                if username_line:
+                    table_lines.append(username_line)
+                    table_lines.append(tier_line)
 
                 embed.add_field(
                     name=f"{profession_icons.get(profession,'')} {profession}",
-                    value=f"{username_line}\n{tier_line}",
+                    value=f"```{chr(10).join(table_lines)}```",
                     inline=False)
 
         return embed
