@@ -1,6 +1,6 @@
 import discord
 from .professions import Professions
-
+from .recipes import RecipesMainView  # import your RecipesMainView class
 
 # ----- Home View -----
 class HomeView(discord.ui.View):
