@@ -8,7 +8,7 @@ from cogs.views import HomeView
 # ------------------------------------------------------
 # Logging Setup
 # ------------------------------------------------------
-LOG_LEVEL = logging.DEBUG  # Change to logging.INFO in production
+LOG_LEVEL = logging.INFO
 logger = logging.getLogger("AshesBot")
 logger.setLevel(LOG_LEVEL)
 
@@ -43,43 +43,6 @@ async def load_cogs():
             logger.error(f"❌ Failed to load {cog}: {e}")
 
 # ------------------------------------------------------
-# Slash Command Logging
-# ------------------------------------------------------
-@bot.event
-async def on_app_command_completion(interaction: discord.Interaction, command: discord.app_commands.Command):
-    logger.info(
-        f"✅ Slash Command | User: {interaction.user} | Command: /{command.name}"
-    )
-
-# ------------------------------------------------------
-# Button & Select Interaction Logging
-# ------------------------------------------------------
-@bot.event
-async def on_interaction(interaction: discord.Interaction):
-    try:
-        if interaction.type == discord.InteractionType.component:
-            component_type = "Select" if isinstance(interaction.data, dict) and interaction.data.get("component_type") == 3 else "Button"
-            logger.info(
-                f"🔘 {component_type} Clicked | User: {interaction.user} | ID: {interaction.data.get('custom_id', 'N/A')}"
-            )
-        elif interaction.type == discord.InteractionType.modal_submit:
-            logger.info(f"📝 Modal Submitted | User: {interaction.user}")
-    except Exception as e:
-        logger.error(f"⚠️ Interaction logging failed: {e}")
-
-# ------------------------------------------------------
-# Error Handling
-# ------------------------------------------------------
-@bot.event
-async def on_command_error(ctx, error):
-    logger.error(f"❌ Command Error | User: {ctx.author} | Error: {error}")
-    await ctx.send(f"⚠️ Something went wrong: `{error}`", delete_after=10)
-
-@bot.event
-async def on_error(event, *args, **kwargs):
-    logger.exception(f"💥 Unexpected error in event: {event}")
-
-# ------------------------------------------------------
 # Bot Ready Event
 # ------------------------------------------------------
 @bot.event
@@ -88,6 +51,8 @@ async def on_ready():
     try:
         professions_cog = bot.get_cog("Professions")
         recipes_cog = bot.get_cog("Recipes")
+
+        # Register persistent home view
         if professions_cog and recipes_cog:
             bot.add_view(HomeView(professions_cog, recipes_cog))
 
@@ -107,32 +72,26 @@ async def home(interaction: discord.Interaction):
 
     if professions_cog is None or recipes_cog is None:
         await interaction.response.send_message(
-            "Required cogs are not loaded yet.", ephemeral=True
+            "⚠️ Required cogs are not loaded yet.", ephemeral=True
         )
         return
 
     try:
-        dm_channel = await interaction.user.create_dm()
-        await dm_channel.send(
-            "Welcome to your Guild Home!",
-            view=HomeView(professions_cog, recipes_cog)
-        )
         await interaction.response.send_message(
-            "I've sent you a DM with your home menu!", ephemeral=True
+            "Welcome to your Guild Home!",
+            view=HomeView(professions_cog, recipes_cog),
+            ephemeral=True
         )
     except discord.Forbidden:
         await interaction.response.send_message(
-            "I couldn't DM you. Please enable DMs.", ephemeral=True
+            "I couldn't open your home menu. Please enable DMs.", ephemeral=True
         )
 
 # ------------------------------------------------------
-# Run Bot
+# Debug Command (Admin Only)
 # ------------------------------------------------------
 from discord import app_commands
 
-# ------------------------------------------------------
-# Hidden Debug Command
-# ------------------------------------------------------
 @bot.tree.command(name="debug", description="Debug bot status")
 @app_commands.checks.has_permissions(administrator=True)
 async def debug(interaction: discord.Interaction):
@@ -140,7 +99,6 @@ async def debug(interaction: discord.Interaction):
     professions_cog = bot.get_cog("Professions")
     recipes_cog = bot.get_cog("Recipes")
 
-    # Check persistent views
     views_info = []
     if hasattr(bot, "_views"):
         for view in bot._views.values():
@@ -149,15 +107,6 @@ async def debug(interaction: discord.Interaction):
     else:
         views_info.append("⚠️ No views registered")
 
-    # Check buttons/selects missing custom_id
-    invalid_items = []
-    for view in getattr(bot, "_views", {}).values():
-        if isinstance(view, discord.ui.View):
-            for item in view.children:
-                if hasattr(item, "custom_id") and not item.custom_id:
-                    invalid_items.append(f"{item.label or 'Unnamed Item'} ({view.__class__.__name__})")
-
-    # Build debug embed
     embed = discord.Embed(
         title="🔍 Bot Debug Information",
         color=discord.Color.blue()
@@ -175,13 +124,6 @@ async def debug(interaction: discord.Interaction):
         inline=False
     )
     embed.add_field(
-        name="Missing custom_id",
-        value="\n".join(invalid_items) if invalid_items else "✅ All items have custom IDs",
-        inline=False
-    )
-
-    # Professions & Recipes cog status
-    embed.add_field(
         name="Professions Cog",
         value="✅ Loaded" if professions_cog else "⚠️ Missing",
         inline=True
@@ -194,7 +136,9 @@ async def debug(interaction: discord.Interaction):
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-
+# ------------------------------------------------------
+# Run Bot
+# ------------------------------------------------------
 async def main():
     async with bot:
         await load_cogs()

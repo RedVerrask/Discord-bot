@@ -9,8 +9,11 @@ class Professions(commands.Cog):
         self.REGISTRY_FILE = "artisan_registry.json"
         self.artisan_registry = self.load_registry()
 
-    # ----- Registry Functions -----
+    # ------------------------------------------------------
+    # Registry Loader / Saver
+    # ------------------------------------------------------
     def load_registry(self):
+        """Loads the artisan registry from file or initializes defaults."""
         if os.path.exists(self.REGISTRY_FILE):
             with open(self.REGISTRY_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
@@ -23,32 +26,42 @@ class Professions(commands.Cog):
         }
 
     def save_registry(self):
+        """Saves the artisan registry to file."""
         with open(self.REGISTRY_FILE, "w", encoding="utf-8") as f:
             json.dump(self.artisan_registry, f, indent=4)
 
+    # ------------------------------------------------------
+    # Profession Assignment
+    # ------------------------------------------------------
     def set_user_profession(self, user_id: int, profession: str, tier: str):
-        # Remove user from other professions if you only allow one profession
+        """Assigns or updates a user's profession and tier."""
+        # Remove from all other professions first (only 1 active profession per user)
         for prof, members in self.artisan_registry.items():
             members.pop(str(user_id), None)
 
+        # Add or update profession tier
         if profession not in self.artisan_registry:
             self.artisan_registry[profession] = {}
         self.artisan_registry[profession][str(user_id)] = tier
         self.save_registry()
 
-    # ----- Get Professions for User -----
+    # ------------------------------------------------------
+    # Profession Retrieval
+    # ------------------------------------------------------
     def get_user_professions(self, user_id: int):
-        """Return a list of profession names the user currently has."""
+        """Returns a list of professions the user currently has."""
         user_id_str = str(user_id)
-        professions = [prof for prof, members in self.artisan_registry.items() if user_id_str in members]
-        return professions
+        return [prof for prof, members in self.artisan_registry.items() if user_id_str in members]
 
-    # ----- Check if User Has Profession -----
     def has_profession(self, user_id: int):
+        """Checks if a user has at least one profession."""
         return bool(self.get_user_professions(user_id))
 
-    # ----- Format Registry for Display -----
+    # ------------------------------------------------------
+    # Profession Registry Formatting (Embeds)
+    # ------------------------------------------------------
     async def format_artisan_registry(self, bot: commands.Bot, guild_id: int = None) -> list:
+        """Creates two embeds — filled & empty professions for the guild."""
         profession_icons = {
             "Fishing": "🎣", "Herbalism": "🌿", "Hunting": "🏹", "Lumberjacking": "🪓", "Mining": "⛏️",
             "Alchemy": "⚗️", "Animal Husbandry": "🐄", "Cooking": "🍳", "Farming": "🌾", "Lumber Milling": "🪵",
@@ -58,23 +71,33 @@ class Professions(commands.Cog):
         }
 
         tier_colors = {
-            "1": "⚪",
-            "2": "🟢",
-            "3": "🔵",
-            "4": "🟣",
-            "5": "🟠"
+            "1": "⚪",  # Novice
+            "2": "🟢",  # Apprentice
+            "3": "🔵",  # Journeyman
+            "4": "🟣",  # Master
+            "5": "🟠"   # Grandmaster
         }
 
         categories = {
             "Gatherers": ["Fishing", "Herbalism", "Hunting", "Lumberjacking", "Mining"],
             "Processors": ["Alchemy", "Animal Husbandry", "Cooking", "Farming", "Lumber Milling",
-                        "Metalworking", "Stonemasonry", "Tanning", "Weaving"],
+                           "Metalworking", "Stonemasonry", "Tanning", "Weaving"],
             "Crafters": ["Arcane Engineering", "Armor Smithing", "Carpentry", "Jewelry",
-                        "Leatherworking", "Scribing", "Tailoring", "Weapon Smithing"],
+                         "Leatherworking", "Scribing", "Tailoring", "Weapon Smithing"],
         }
 
-        filled_embed = discord.Embed(title="Current Professions", color=discord.Color.blurple())
-        empty_embed = discord.Embed(title="Vacant Professions", color=discord.Color.greyple())
+        filled_embed = discord.Embed(
+            title="📜 Current Professions",
+            description="Here are the currently registered professions:",
+            color=discord.Color.blurple()
+        )
+
+        empty_embed = discord.Embed(
+            title="📭 Vacant Professions",
+            description="Professions with no registered members:",
+            color=discord.Color.greyple()
+        )
+
         guild = bot.get_guild(guild_id) if guild_id else None
 
         for category_name, professions in categories.items():
@@ -92,14 +115,17 @@ class Professions(commands.Cog):
                             if member:
                                 display_name = member.display_name
                         if display_name == "Unknown":
-                            user = await bot.fetch_user(int(user_id))
-                            display_name = user.name
+                            try:
+                                user = await bot.fetch_user(int(user_id))
+                                display_name = user.name
+                            except:
+                                display_name = f"User {user_id}"
 
                         color = tier_colors.get(str(tier), "⚪")
-                        member_lines.append(f"{display_name} - {color} Tier {tier}")
-                    filled_text += f"{profession_icons.get(prof,'')} {prof}: " + ", ".join(member_lines) + "\n"
+                        member_lines.append(f"{display_name} — {color} Tier {tier}")
+                    filled_text += f"{profession_icons.get(prof,'')} **{prof}**: " + ", ".join(member_lines) + "\n"
                 else:
-                    empty_text += f"{profession_icons.get(prof,'')} {prof} - *Empty*\n"
+                    empty_text += f"{profession_icons.get(prof,'')} {prof} — *Empty*\n"
 
             if filled_text:
                 filled_embed.add_field(name=f"**{category_name}**", value=filled_text, inline=False)
@@ -108,6 +134,8 @@ class Professions(commands.Cog):
 
         return [filled_embed, empty_embed]
 
-# ----- Setup Cog -----
+# ------------------------------------------------------
+# Setup Cog
+# ------------------------------------------------------
 async def setup(bot):
     await bot.add_cog(Professions(bot))
