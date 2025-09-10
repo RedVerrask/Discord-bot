@@ -4,7 +4,7 @@ from .recipes import Recipes, RecipesMainView
 
 # ----- Home View -----
 class HomeView(discord.ui.View):
-    def __init__(self, professions_cog: Professions, recipes_cog: Recipes):
+    def __init__(self, professions_cog, recipes_cog):
         super().__init__(timeout=None)
         self.professions_cog = professions_cog
         self.recipes_cog = recipes_cog
@@ -19,12 +19,9 @@ class HomeView(discord.ui.View):
 
     @discord.ui.button(label="Recipes", style=discord.ButtonStyle.primary)
     async def recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            "Recipe Menu:",
-            view=RecipesMainView(self.recipes_cog),
-            ephemeral=True
-        )
-
+        # Only pass self.recipes_cog if RecipesMainView accepts it
+        view = RecipesMainView(self.recipes_cog)
+        await interaction.response.send_message("Recipe Menu:", view=view, ephemeral=True)
 
 # ----- Tier Select View -----
 class TierSelectView(discord.ui.View):
