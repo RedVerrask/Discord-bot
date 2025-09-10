@@ -73,7 +73,6 @@ async def load_cogs(bot: AshesBot):
 # ------------------------------------------------------
 @bot.tree.command(name="home", description="Open your guild home menu")
 async def home(interaction: discord.Interaction):
-    logger.info(f"🏠 /home triggered by {interaction.user}")
     professions_cog = bot.get_cog("Professions")
     recipes_cog = bot.get_cog("Recipes")
 
@@ -83,20 +82,20 @@ async def home(interaction: discord.Interaction):
         )
         return
 
-    try:
-        # Send Home Menu via DM
-        dm_channel = await interaction.user.create_dm()
-        await dm_channel.send(
-            "🏠 Welcome to your Guild Home!",
-            view=HomeView(professions_cog, recipes_cog)
-        )
-        await interaction.response.send_message(
-            "📩 I've sent you a DM with your home menu!", ephemeral=True
-        )
-    except discord.Forbidden:
-        await interaction.response.send_message(
-            "⚠️ I can't DM you. Please enable DMs.", ephemeral=True
-        )
+    # Create embed with banner
+    embed = discord.Embed(
+        title="🏰 Guild Codex",
+        description="Your guide to artisans, recipes, and knowledge.",
+        color=discord.Color.gold()
+    )
+    embed.set_image(url="https://cdn.discordapp.com/attachments/691099716657741864/1415440284111863903/ChatGPT_Image_Sep_10_2025_02_54_03_PM.png?ex=68c336fd&is=68c1e57d&hm=a5c30c34a2aa5eaed7d712cd916fbdf4d51feb7adf1a9409571d080d13498d9a&")
+    embed.set_footer(text="Ashes of Creation - Guild Codex")
+
+    await interaction.response.send_message(
+        embed=embed,
+        view=HomeView(professions_cog, recipes_cog),
+        ephemeral=True
+    )
 
 # ------------------------------------------------------
 # Debug Command
