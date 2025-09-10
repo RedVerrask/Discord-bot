@@ -108,8 +108,14 @@ class RecipeButton(Button):
         self.recipe = recipe
 
     async def callback(self, interaction: discord.Interaction):
-        # Ask for confirmation before learning
-        await interaction.response.send_message(f"Do you want to learn **{self.recipe['name']}**?", view=ConfirmLearnView(self.recipes_cog, self.user_id, self.recipe), ephemeral=True)
+        try:
+            await interaction.response.send_message(
+                f"Do you want to learn **{self.recipe['name']}**?",
+                view=ConfirmLearnView(self.recipes_cog, self.user_id, self.recipe),
+                ephemeral=True
+            )
+        except Exception as e:
+            await interaction.response.send_message(f"Error: {e}", ephemeral=True)
 
 
 class ConfirmLearnView(View):
@@ -174,8 +180,13 @@ class UserPortfolioView(View):
         super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
         self.users = self.recipes_cog.get_users_with_portfolio()
-        for user_id, name in self.users.items():
-            self.add_item(UserButton(self.recipes_cog, user_id, name))
+        if not self.users:
+            # If no portfolios exist, show a disabled button or a message
+            self.add_item(Button(label="No users found", disabled=True))
+        else:
+            for user_id, name in self.users.items():
+                self.add_item(UserButton(self.recipes_cog, user_id, name))
+
 
 
 class UserButton(Button):
@@ -259,12 +270,13 @@ class Recipes(commands.Cog):
         self.user_portfolios = self.load_portfolios()  # Load from portfolios.json
 
     def get_all_recipes(self):
-        # Remove "Recipe: " prefix for display/search
+        recipes_list = self.recipes_data if isinstance(self.recipes_data, list) else self.recipes_data.get("recipes", [])
         cleaned = []
-        for r in self.recipes_data["recipes"]:
+        for r in recipes_list:
             recipe = r.copy()
             if recipe["name"].startswith("Recipe: "):
-                recipe["name"] = recipe["name"][8:]  # remove first 8 chars
+                recipe["name"] = recipe["name"][8:]
+            recipe["level"] = int(recipe["level"])
             cleaned.append(recipe)
         return cleaned
 
