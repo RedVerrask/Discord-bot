@@ -91,7 +91,7 @@ class Professions(commands.Cog):
                 for user_id, tier in members.items():
                     try:
                         user = await bot.fetch_user(int(user_id))  # await needed inside async
-                        display_name = user.display_name if user else "Unknown"
+                        display_name = display_name = f"{user.name}#{user.discriminator}"
                     except discord.NotFound:
                         display_name = "Unknown"
 
