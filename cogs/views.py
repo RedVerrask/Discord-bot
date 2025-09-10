@@ -1,6 +1,7 @@
 import discord
 from .professions import Professions
 from .recipes import Recipes, RecipesMainView
+import discord
 
 # ----- Home View -----
 class HomeView(discord.ui.View):
@@ -232,5 +233,4 @@ class AddArtisanView(discord.ui.View):
             content="Back to home:",
             view=HomeView(self.professions_cog, self.recipes_cog)
         )
-
 
