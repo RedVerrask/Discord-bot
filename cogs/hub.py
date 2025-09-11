@@ -423,19 +423,30 @@ class Hub(commands.Cog):
         return e
 
     async def render_professions(self, user_id: int) -> discord.Embed:
-        e = discord.Embed(title="🛠️ Professions", color=discord.Color.orange())
         pro_cog = self.bot.get_cog("Professions")
-        try:
-            if pro_cog and hasattr(pro_cog, "get_user_professions"):
-                profs = pro_cog.get_user_professions(user_id)  # type: ignore
-                if profs:
-                    lines = [f"• **{p.get('name','?')}** — Tier {p.get('tier') or p.get('level','?')}" for p in profs]
-                    e.add_field(name="Your Professions", value="\n".join(lines), inline=False)
-                else:
-                    e.add_field(name="Your Professions", value="*None selected yet.*", inline=False)
-        except Exception as ex:
-            e.add_field(name="Notice", value=f"Professions data unavailable.\n{type(ex).__name__}: {ex}", inline=False)
+        if pro_cog and hasattr(pro_cog, "build_professions_embed"):
+            try:
+                user = self.bot.get_user(user_id) or discord.Object(id=user_id)  # type: ignore
+                built = pro_cog.build_professions_embed(user)  # type: ignore
+                if isinstance(built, discord.Embed):
+                    return built
+            except Exception as ex:
+                e = discord.Embed(title="🛠️ Professions", color=discord.Color.red())
+                e.add_field(
+                    name="Notice",
+                    value=f"Professions temporarily unavailable.\n{type(ex).__name__}: {ex}",
+                    inline=False
+                )
+                return e
+
+        # Fallback if Professions cog not loaded
+        e = discord.Embed(
+            title="🛠️ Professions",
+            description="No professions selected yet.",
+            color=discord.Color.orange(),
+        )
         return e
+
 
     async def render_recipes(self, user_id: int) -> discord.Embed:
         e = discord.Embed(title="📜 Recipes", color=discord.Color.green())

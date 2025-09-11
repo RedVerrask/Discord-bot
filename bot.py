@@ -93,9 +93,10 @@ async def debug_cmd(interaction: discord.Interaction):
 # =========================
 @bot.event
 async def on_ready():
-    logger.info(f"✅ Logged in as {bot.user} ({bot.user.id})")
-    logger.info(f"🌐 Connected to {len(bot.guilds)} servers.")
-    logger.info("📌 Slash Commands: %s", [cmd.name for cmd in bot.tree.get_commands()])
+    guild = discord.Object(id=1064785222576644137)  # put your server ID here
+    await bot.tree.sync(guild=guild)
+    print("🌐 Slash commands synced instantly!")
+
 
 @bot.event
 async def on_command_error(ctx, error):

@@ -1,129 +1,86 @@
+# cogs/profile.py
 import discord
 from discord.ext import commands
-from discord.ui import Modal, TextInput, View, Button
+from discord.ui import View, Button, Modal, TextInput, Select
 from utils.data import load_json, save_json
 from cogs.hub import refresh_hub
-from utils.debug import debug_log
 
-debug_log("Set classes", bot=self.bot, user=interaction.user.id, primary=primary_class, secondary=secondary_class)
-debug_log("Wishlist updated", bot=self.bot, user=interaction.user.id, item=item, action="added")
+PROFILE_FILE = "data/profiles.json"
 
+# Fixed list of classes (Ashes archetypes + combos if you want to expand later)
+PRIMARY_CLASSES = [
+    "Fighter", "Tank", "Rogue", "Ranger",
+    "Mage", "Cleric", "Summoner", "Bard"
+]
+SECONDARY_CLASSES = PRIMARY_CLASSES  # same set for now
 
-PROFILE_FILE = "profiles.json"
 
 class Profile(commands.Cog):
-    """Handles player profiles: classes, wishlist, and learned recipes summary."""
+    """Handles profiles, classes, and wishlists."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.profiles = load_json(PROFILE_FILE, {})
+        self.profiles = load_json(PROFILE_FILE, {})  # { user_id: { classes: {primary, secondary}, wishlist: [] } }
 
-    def save_profiles(self):
+    def save(self):
         save_json(PROFILE_FILE, self.profiles)
 
-    # ==============================
-    # Public API
-    # ==============================
-    def get_user_profile(self, user_id: int):
-        return self.profiles.get(str(user_id), {
-            "classes": {"primary": None, "secondary": None},
-            "wishlist": []
-        })
+    # ---------------- Public API ----------------
+    def get_profile(self, user_id: int):
+        return self.profiles.setdefault(str(user_id), {"classes": {"primary": None, "secondary": None}, "wishlist": []})
 
-    def set_user_profile(self, user_id: int, data: dict):
-        self.profiles[str(user_id)] = data
-        self.save_profiles()
+    def get_wishlist(self, user_id: int):
+        return self.get_profile(user_id).get("wishlist", [])
 
-    def build_profile_embed(self, user: discord.User) -> discord.Embed:
-        profile = self.get_user_profile(user.id)
-        wishlist = profile.get("wishlist", [])
-        classes = profile.get("classes", {})
+    def add_to_wishlist(self, user_id: int, item: str):
+        profile = self.get_profile(user_id)
+        wishlist = profile.setdefault("wishlist", [])
+        if item not in wishlist:
+            wishlist.append(item)
+            self.save()
+            return True
+        return False
 
-        embed = discord.Embed(
-            title=f"👤 {user.display_name}'s Profile",
-            color=discord.Color.blue(),
-        )
+    def remove_from_wishlist(self, user_id: int, item: str):
+        profile = self.get_profile(user_id)
+        wishlist = profile.setdefault("wishlist", [])
+        if item in wishlist:
+            wishlist.remove(item)
+            self.save()
+            return True
+        return False
 
-        # Classes
-        embed.add_field(
-            name="🎭 Classes",
-            value=f"Primary: **{classes.get('primary') or 'Unset'}**\nSecondary: **{classes.get('secondary') or 'Unset'}**",
-            inline=False
-        )
+    def set_classes(self, user_id: int, primary: str, secondary: str):
+        profile = self.get_profile(user_id)
+        profile["classes"] = {"primary": primary, "secondary": secondary}
+        self.save()
 
-        # Wishlist
-        if wishlist:
-            embed.add_field(
-                name="🧾 Wishlist",
-                value="\n".join([f"• {item}" for item in wishlist])[:1024],
-                inline=False
-            )
-        else:
-            embed.add_field(
-                name="🧾 Wishlist",
-                value="*No wishlist items yet.*",
-                inline=False
-            )
-
-        # Learned Recipes (summary only)
-        recipes_cog = self.bot.get_cog("Recipes")
-        if recipes_cog and hasattr(recipes_cog, "get_user_recipes"):
-            learned = recipes_cog.get_user_recipes(user.id)
-            total = sum(len(r) for r in learned.values()) if isinstance(learned, dict) else 0
-            embed.add_field(
-                name="📘 Learned Recipes",
-                value=f"Total learned: **{total}**",
-                inline=False
-            )
-
-        return embed
-
-    # ==============================
-    # UI Buttons & Modals
-    # ==============================
-    class EditClassesModal(Modal, title="🎭 Edit Classes"):
+    # ---------------- UI: Modals ----------------
+    class AddWishlistModal(Modal, title="➕ Add Wishlist Item"):
         def __init__(self, cog: "Profile", user_id: int):
             super().__init__(timeout=180)
             self.cog = cog
             self.user_id = user_id
-            self.primary = TextInput(label="Primary Class", required=True, placeholder="e.g. Bard")
-            self.secondary = TextInput(label="Secondary Class", required=True, placeholder="e.g. Rogue")
-            self.add_item(self.primary)
-            self.add_item(self.secondary)
-
-        async def on_submit(self, interaction: discord.Interaction):
-            profile = self.cog.get_user_profile(self.user_id)
-            profile["classes"]["primary"] = self.primary.value
-            profile["classes"]["secondary"] = self.secondary.value
-            self.cog.set_user_profile(self.user_id, profile)
-            await refresh_hub(interaction, section="profile")
-
-    class AddWishlistModal(Modal, title="🧾 Add Wishlist Item"):
-        def __init__(self, cog: "Profile", user_id: int):
-            super().__init__(timeout=180)
-            self.cog = cog
-            self.user_id = user_id
-            self.item = TextInput(label="Item Name", required=True, placeholder="e.g. Obsidian Dagger")
+            self.item = TextInput(label="Item Name", placeholder="e.g. Obsidian Dagger", required=True)
             self.add_item(self.item)
 
         async def on_submit(self, interaction: discord.Interaction):
-            profile = self.cog.get_user_profile(self.user_id)
-            wishlist = profile.setdefault("wishlist", [])
-            if self.item.value not in wishlist:
-                wishlist.append(self.item.value)
-                self.cog.set_user_profile(self.user_id, profile)
+            added = self.cog.add_to_wishlist(self.user_id, self.item.value)
+            msg = f"✅ Added **{self.item.value}** to your wishlist." if added else f"⚠️ **{self.item.value}** is already in your wishlist."
+            e = discord.Embed(title="📌 Wishlist Updated", description=msg, color=discord.Color.green())
             await refresh_hub(interaction, section="profile")
 
     class RemoveWishlistView(View):
         def __init__(self, cog: "Profile", user_id: int):
-            super().__init__(timeout=120)
+            super().__init__(timeout=300)
             self.cog = cog
             self.user_id = user_id
-            profile = self.cog.get_user_profile(user_id)
-            wishlist = profile.get("wishlist", [])
-
-            for item in wishlist:
-                self.add_item(self._RemoveBtn(self.cog, user_id, item))
+            wishlist = self.cog.get_wishlist(user_id)
+            if not wishlist:
+                self.add_item(Button(label="No items to remove", style=discord.ButtonStyle.secondary, disabled=True))
+            else:
+                for item in wishlist:
+                    self.add_item(self._RemoveBtn(self.cog, self.user_id, item))
 
         class _RemoveBtn(Button):
             def __init__(self, cog: "Profile", user_id: int, item: str):
@@ -133,25 +90,94 @@ class Profile(commands.Cog):
                 self.item = item
 
             async def callback(self, interaction: discord.Interaction):
-                profile = self.cog.get_user_profile(self.user_id)
-                wishlist = profile.get("wishlist", [])
-                if self.item in wishlist:
-                    wishlist.remove(self.item)
-                    self.cog.set_user_profile(self.user_id, profile)
+                self.cog.remove_from_wishlist(self.user_id, self.item)
                 await refresh_hub(interaction, section="profile")
 
-    # ==============================
-    # Hub Buttons
-    # ==============================
+    # ---------------- UI: Edit Profile ----------------
+    class EditProfileView(View):
+        def __init__(self, cog: "Profile", user_id: int):
+            super().__init__(timeout=240)
+            self.cog = cog
+            self.user_id = user_id
+            self.add_item(self.PrimarySelect(self.cog, self.user_id))
+            self.add_item(self.SecondarySelect(self.cog, self.user_id))
+
+        class PrimarySelect(Select):
+            def __init__(self, cog: "Profile", user_id: int):
+                opts = [discord.SelectOption(label=cls) for cls in PRIMARY_CLASSES]
+                super().__init__(placeholder="Choose Primary Class", options=opts)
+                self.cog = cog
+                self.user_id = user_id
+
+            async def callback(self, interaction: discord.Interaction):
+                primary = self.values[0]
+                profile = self.cog.get_profile(self.user_id)
+                secondary = profile["classes"].get("secondary")
+                self.cog.set_classes(self.user_id, primary, secondary)
+                await refresh_hub(interaction, section="profile")
+
+        class SecondarySelect(Select):
+            def __init__(self, cog: "Profile", user_id: int):
+                opts = [discord.SelectOption(label=cls) for cls in SECONDARY_CLASSES]
+                super().__init__(placeholder="Choose Secondary Class", options=opts)
+                self.cog = cog
+                self.user_id = user_id
+
+            async def callback(self, interaction: discord.Interaction):
+                secondary = self.values[0]
+                profile = self.cog.get_profile(self.user_id)
+                primary = profile["classes"].get("primary")
+                self.cog.set_classes(self.user_id, primary, secondary)
+                await refresh_hub(interaction, section="profile")
+
+    # ---------------- Hub Buttons ----------------
     def build_profile_buttons(self, user_id: int):
-        view = View(timeout=120)
-        view.add_item(Button(label="🎭 Edit Classes", style=discord.ButtonStyle.primary,
-                             custom_id=f"edit_classes_{user_id}"))
-        view.add_item(Button(label="🧾 Add Wishlist", style=discord.ButtonStyle.success,
-                             custom_id=f"add_wishlist_{user_id}"))
-        view.add_item(Button(label="❌ Remove Wishlist", style=discord.ButtonStyle.danger,
-                             custom_id=f"remove_wishlist_{user_id}"))
-        return view
+        v = View(timeout=180)
+        v.add_item(Button(label="✏️ Edit Profile", style=discord.ButtonStyle.primary, custom_id=f"pf_edit_{user_id}"))
+        v.add_item(Button(label="➕ Add Wishlist", style=discord.ButtonStyle.success, custom_id=f"pf_addwl_{user_id}"))
+        v.add_item(Button(label="🗑 Remove Wishlist", style=discord.ButtonStyle.danger, custom_id=f"pf_remwl_{user_id}"))
+        return v
+
+    # ---------------- Interaction Handling ----------------
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        if not getattr(interaction, "data", None):
+            return
+        cid = interaction.data.get("custom_id")
+        if not cid or not isinstance(cid, str):
+            return
+
+        uid = interaction.user.id
+
+        # Edit profile
+        if cid == f"pf_edit_{uid}":
+            e = discord.Embed(title="✏️ Edit Profile", description="Select your Primary and Secondary classes.", color=discord.Color.blue())
+            v = Profile.EditProfileView(self, uid)
+            return await interaction.response.edit_message(embed=e, view=v)
+
+        # Add to wishlist
+        if cid == f"pf_addwl_{uid}":
+            modal = Profile.AddWishlistModal(self, uid)
+            return await interaction.response.send_modal(modal)
+
+        # Remove from wishlist
+        if cid == f"pf_remwl_{uid}":
+            e = discord.Embed(title="🗑 Remove Wishlist Item", description="Select an item to remove.", color=discord.Color.red())
+            v = Profile.RemoveWishlistView(self, uid)
+            return await interaction.response.edit_message(embed=e, view=v)
+
+    # ---------------- Profile Embed ----------------
+    def build_profile_embed(self, user: discord.User):
+        profile = self.get_profile(user.id)
+        classes = profile.get("classes", {})
+        wishlist = profile.get("wishlist", [])
+
+        e = discord.Embed(title=f"👤 {user.display_name}'s Profile", color=discord.Color.blue())
+        e.add_field(name="🎭 Classes", value=f"Primary: {classes.get('primary') or '—'}\nSecondary: {classes.get('secondary') or '—'}", inline=False)
+        e.add_field(name="📌 Wishlist", value="\n".join(wishlist) if wishlist else "*Empty*", inline=False)
+        e.set_footer(text="Use the buttons below to manage your profile.")
+        return e
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Profile(bot))
