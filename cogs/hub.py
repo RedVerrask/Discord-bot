@@ -475,13 +475,27 @@ class Hub(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    # 👇 add this dispatcher back
+    async def render(self, user_id: int, section: str):
+        if section == "home":
+            return self.render_home(user_id)
+        if section == "profile":
+            return self.render_profile(user_id)
+        if section == "professions":
+            return self.render_professions(user_id)
+        if section == "recipes":
+            return self.render_recipes(user_id)
+        if section == "market":
+            return self.render_market(user_id)
+        return self.render_home(user_id)
+
     # Slash command version
     @app_commands.command(name="home", description="Open your private Guild Codex hub")
-    async def home(self, interaction: discord.Interaction):
+    async def home_slash(self, interaction: discord.Interaction):
         embed, view = await self.render(interaction.user.id, "home")
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    # Optional text-command fallback (!home)
+    # Optional prefix fallback
     @commands.command(name="home")
     async def home_prefix(self, ctx: commands.Context):
         embed, view = await self.render(ctx.author.id, "home")
