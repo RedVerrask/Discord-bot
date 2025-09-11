@@ -475,120 +475,53 @@ class Hub(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-        # Handy accessors (bound at use-time)
-        # We don't cache cogs here to avoid race with setup order.
+        # Register /home slash command directly
+        @bot.tree.command(name="home", description="Open your private Guild Codex hub")
+        async def home(interaction: discord.Interaction):
+            embed, view = await self.render(interaction.user.id, "home")
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    # Quick properties
+    # Quick properties (profile/prof/recipes/market)
     @property
-    def profile(self):
-        return self.bot.get_cog("Profile")
+    def profile(self): return self.bot.get_cog("Profile")
     @property
-    def prof(self):
-        return self.bot.get_cog("Professions")
+    def prof(self): return self.bot.get_cog("Professions")
     @property
-    def recipes(self):
-        return self.bot.get_cog("Recipes")
+    def recipes(self): return self.bot.get_cog("Recipes")
     @property
-    def market(self):
-        return self.bot.get_cog("Market")
+    def market(self): return self.bot.get_cog("Market")
 
-    # ---------- Public render ----------
-    async def render(self, user_id: int, section: str) -> tuple[discord.Embed, discord.ui.View]:
-        if section == "home":
-            return self.render_home(user_id)
-        if section == "profile":
-            return self.render_profile(user_id)
-        if section == "professions":
-            return self.render_professions(user_id)
-        if section == "recipes":
-            return self.render_recipes(user_id)
-        if section == "market":
-            return self.render_market(user_id)
-        return self.render_home(user_id)
+    # Keep all your render_* methods here (render_home, render_profile, etc.)
+    # ... (they’re already in your file above)
 
-    def render_home(self, user_id: int):
-        e = discord.Embed(
-            title="🏰 Guild Codex",
-            description="Your private control panel for **Profile**, **Professions**, **Recipes**, and **Market**.\nUse the buttons above. (All actions are **ephemeral** — only you can see them.)",
-            color=discord.Color.gold(),
+    @commands.hybrid_command(name="hubportal", description="(Admin) Post the hub portal message in this channel")
+    @commands.has_permissions(administrator=True)
+    async def hubportal(self, ctx: commands.Context):
+        """Admin command: posts a permanent portal message for members to open their hub."""
+        view = PortalView(self)
+        embed = discord.Embed(
+            title="🏰 Guild Codex Portal",
+            description="Click below to open your personal **Guild Codex** hub.\n\nAll interactions are **private** — only you can see your hub.",
+            color=discord.Color.gold()
         )
-        v = HubView(self, user_id, section="home")
-        e.set_footer(text="Ashes of Creation — Guild Codex")
-        return e, v
+        await ctx.send(embed=embed, view=view)
+        await ctx.reply(f"✅ Portal posted in {ctx.channel.mention}", ephemeral=True)
 
-    def render_profile(self, user_id: int):
-        user = self.bot.get_user(user_id)
-        embed = self.profile.build_profile_embed(user) if self.profile else discord.Embed(title="👤 Profile", description="Unavailable", color=discord.Color.red())
-        view = HubView(self, user_id, section="profile")
-        # Add section controls under nav
-        for item in ProfilePanel(self, user_id).children:
-            view.add_item(item)
-        return embed, view
 
-    def render_professions(self, user_id: int):
-        e = discord.Embed(title="🛠️ Professions", color=discord.Color.orange())
-        if self.prof:
-            profs = self.prof.get_user_professions(user_id)
-            if profs:
-                s = "\n".join([f"• {p['name']} — Tier {p.get('tier','1')}" for p in profs])
-            else:
-                s = "*You have not selected any professions yet.*"
-            e.add_field(name="Your Professions", value=s, inline=False)
-        v = HubView(self, user_id, section="professions")
-        for item in ProfessionsPanel(self, user_id).children:
-            v.add_item(item)
-        return e, v
+class PortalView(discord.ui.View):
+    def __init__(self, hub: Hub):
+        super().__init__(timeout=None)
+        self.hub = hub
 
-    def render_recipes(self, user_id: int):
-        learned = _get_learned(user_id)
-        total = sum(len(v) for v in learned.values())
-        grouped = _load_grouped_recipes_from_file()
-        e = discord.Embed(
-            title="📜 Recipes",
-            description="Learn, search, and browse your learned recipes.",
-            color=discord.Color.green()
-        )
-        e.add_field(name="📘 Learned", value=f"{total} total" if total else "*None yet*", inline=False)
-        e.add_field(name="📚 Catalog", value=f"{sum(len(v) for v in grouped.values())} items", inline=True)
-        v = HubView(self, user_id, section="recipes")
-        for item in RecipesPanel(self, user_id).children:
-            v.add_item(item)
-        return e, v
+    @discord.ui.button(label="Open My Hub", style=discord.ButtonStyle.primary, emoji="🏰")
+    async def open_hub(self, itx: discord.Interaction, _: discord.ui.Button):
+        embed, view = await self.hub.render(itx.user.id, "home")
+        await itx.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    def render_market(self, user_id: int):
-        e = discord.Embed(title="💰 Market", description="Add/remove listings, browse your listings, and search.", color=discord.Color.teal())
-        if self.market:
-            mine = self.market.get_user_listings(user_id)
-            if mine:
-                rows = "\n".join([f"• {m['item']} — {m.get('price_str','?')} | {m['village']}" for m in mine[:8]])
-                e.add_field(name="My Listings (first 8)", value=rows, inline=False)
-            else:
-                e.add_field(name="My Listings", value="*No active listings*", inline=False)
-        v = HubView(self, user_id, section="market")
-        for item in MarketPanel(self, user_id).children:
-            v.add_item(item)
-        return e, v
 
-    # ---------- Learned pagination ----------
-    def make_learned_embed(self, user_id: int, items: List[Tuple[str,str]], page: int, per: int = 10):
-        total_pages = max(1, (len(items) + per - 1) // per)
-        page = max(1, min(page, total_pages))
-        start, end = (page - 1)*per, (page - 1)*per + per
-        lines = [f"• **{name}** — *{prof}*" for prof, name in items[start:end]]
-        e = discord.Embed(title=f"📖 Learned Recipes — Page {page}/{total_pages}", description="\n".join(lines) or "*No items on this page*", color=discord.Color.green())
-        v = LearnedPagerView(self, user_id, items, page, total_pages)
-        return e, v
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Hub(bot))
 
-    # ---------- Listings pagination ----------
-    def make_my_listings_embed(self, user_id: int, page: int, per: int = 10):
-        mine = self.market.get_user_listings(user_id) if self.market else []
-        total_pages = max(1, (len(mine) + per - 1) // per)
-        page = max(1, min(page, total_pages))
-        start, end = (page - 1)*per, (page - 1)*per + per
-        rows = [f"• **{m['item']}** — {m.get('price_str','?')} | {m['village']}" + (f" — {m['note']}" if m.get('note') else "") for m in mine[start:end]]
-        e = discord.Embed(title=f"💰 My Listings — Page {page}/{total_pages}", description="\n".join(rows) or "*No items on this page*", color=discord.Color.teal())
-        v = ListingsPagerView(self, user_id, page, total_pages)
-        return e, v
 
 # ---------- Pagination Views ----------
 class LearnedPagerView(discord.ui.View):
@@ -628,28 +561,7 @@ class ListingsPagerView(discord.ui.View):
             e, v = self.p.hub.make_my_listings_embed(self.p.user_id, self.p.page + 1)
             await itx.response.edit_message(embed=e, view=v)
 
-# ---------------- Commands: only to open hub (one-time), everything else is UI ----------------
-class Hub(commands.Cog):
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-
-        # Register /home slash command directly
-        @bot.tree.command(name="home", description="Open your private Guild Codex hub")
-        async def home(interaction: discord.Interaction):
-            embed, view = await self.render(interaction.user.id, "home")
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-    @commands.hybrid_command(name="hubportal", description="(Admin) Post the hub portal message in this channel")
-    @commands.has_permissions(administrator=True)
-    async def hubportal(self, ctx: commands.Context):
-        """Admin command: posts a permanent portal message for members to open their hub."""
-        view = PortalView(self)
-        embed = discord.Embed(
-            title="🏰 Guild Codex Portal",
-            description="Click below to open your personal **Guild Codex** hub.\n\nAll interactions are **private** — only you can see your hub.",
-            color=discord.Color.gold()
-        )
-        msg = await ctx.send(embed=embed, view=view)
-        await ctx.reply(f"✅ Portal posted in {ctx.channel.mention}", ephemeral=True)
+# ---------------- Portal View ----------------
 
 
 class PortalView(discord.ui.View):
