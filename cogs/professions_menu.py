@@ -70,6 +70,21 @@ class ProfessionsMenu(discord.ui.View):
         dropdown.callback = dropdown_callback
         view.add_item(dropdown)
 
+        @discord.ui.button(label="📜 View Current Professions", style=discord.ButtonStyle.success, custom_id="prof_view_current")
+        async def view_current_professions(self, interaction: discord.Interaction, button: discord.ui.Button):
+            guild_id = interaction.guild.id if interaction.guild else None
+            embeds = await self.professions_cog.format_artisan_registry(interaction.client, guild_id=guild_id)
+
+            if not embeds:
+                await interaction.response.send_message(
+                    "⚠️ No profession data found.",
+                    ephemeral=True
+                )
+                return
+
+            await interaction.response.send_message(embeds=embeds, ephemeral=True)
+
+
         # Back button
         back_button = discord.ui.Button(label="⬅ Back", style=discord.ButtonStyle.secondary)
         async def back_callback(back_interaction: discord.Interaction):
