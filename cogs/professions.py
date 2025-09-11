@@ -2,15 +2,21 @@ import discord
 from discord.ext import commands
 import json
 import os
+import logging
+from typing import Dict, List, Any
+from cogs.hub import refresh_hub  # live hub refresh
 
+logger = logging.getLogger("AshesBot")
 PROFILES_FILE = "data/profiles.json"
 REGISTRY_FILE = "data/artisan_registry.json"
 
-# Profession aliases for syncing with recipes.json
-PROFESSION_ALIASES = {
+# Profession aliases for syncing with recipes.json and UI
+PROFESSION_ALIASES: Dict[str, str] = {
     "Jeweler": "Jewelry",
     "Scribe": "Scribing",
-    "Crafting": "Arcane Engineering"
+    "Crafting": "Arcane Engineering",
+    "Armorsmithing": "Armor Smithing",
+    "Weaponsmithing": "Weapon Smithing",
 }
 
 TIER_COLORS = {
@@ -18,160 +24,153 @@ TIER_COLORS = {
     "2": "🟢",  # Apprentice
     "3": "🔵",  # Journeyman
     "4": "🟣",  # Master
-    "5": "🟠"   # Grandmaster
+    "5": "🟠",  # Grandmaster
 }
 
+# -------------------- JSON HELPERS --------------------
+def _load_json(path: str, default: Any):
+    if not os.path.exists(path):
+        return default
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
 
-# ======================================================
-# Utility: Profiles + Registry Sync
-# ======================================================
+def _save_json(path: str, data: Any):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
 def load_profiles():
-    if not os.path.exists(PROFILES_FILE):
-        return {}
-    with open(PROFILES_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return _load_json(PROFILES_FILE, {})
 
 def save_profiles(data):
-    with open(PROFILES_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    _save_json(PROFILES_FILE, data)
 
 def load_registry():
-    if not os.path.exists(REGISTRY_FILE):
-        return {}
-    with open(REGISTRY_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return _load_json(REGISTRY_FILE, {})
 
 def save_registry(data):
-    with open(REGISTRY_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    _save_json(REGISTRY_FILE, data)
 
 
-# ======================================================
-# Professions Cog
-# ======================================================
+# ================================ Cog ================================
 class Professions(commands.Cog):
+    """Track each player's professions (max 2), tiers, and a guild registry."""
     def __init__(self, bot):
         self.bot = bot
-        self.profiles = load_profiles()
-        self.artisan_registry = load_registry()
+        self.profiles: Dict[str, Dict[str, Any]] = load_profiles()
+        self.artisan_registry: Dict[str, Dict[str, str]] = load_registry()
 
-    # -----------------------------
-    # Get Player Profile
-    # -----------------------------
-    def get_profile(self, user_id):
-        user_id = str(user_id)
-        if user_id not in self.profiles:
-            self.profiles[user_id] = {"professions": []}
+    # ---------- core helpers ----------
+    def _norm(self, name: str) -> str:
+        return PROFESSION_ALIASES.get(name, name)
+
+    def get_profile(self, user_id: int) -> Dict[str, Any]:
+        uid = str(user_id)
+        if uid not in self.profiles:
+            self.profiles[uid] = {"professions": []}
             save_profiles(self.profiles)
-        return self.profiles[user_id]
+        return self.profiles[uid]
 
-    # -----------------------------
-    # Assign / Update Profession
-    # -----------------------------
-    def set_user_profession(self, user_id, profession, tier):
-        """Assign or update profession, enforcing 2 max limit."""
-        user_id_str = str(user_id)
+    def get_user_professions(self, user_id: int) -> List[Dict[str, str]]:
+        return self.get_profile(user_id).get("professions", [])
+
+    # ---------- embeds ----------
+    def build_user_professions_embed(self, member: discord.Member | discord.User):
+        profs = self.get_user_professions(member.id)
+        if not profs:
+            desc = "*You haven’t selected any professions yet.*"
+        else:
+            lines = []
+            for p in profs:
+                tier = str(p.get("tier", "1"))
+                lines.append(f"{TIER_COLORS.get(tier, '⚪')} **{p['name']}** — Tier {tier}")
+            desc = "\n".join(lines)
+        return discord.Embed(
+            title=f"🛠️ {getattr(member, 'display_name', member.id)} — Current Professions",
+            description=desc,
+            color=discord.Color.blurple()
+        )
+
+    # ---------- mutations ----------
+    def set_user_profession(self, user_id: int, profession: str, tier: str) -> bool:
+        """Assign/update profession; max 2 per user. Returns True if set."""
+        uid = str(user_id)
         profile = self.get_profile(user_id)
+        profession = self._norm(profession)
 
-        # Alias mapping
-        profession = PROFESSION_ALIASES.get(profession, profession)
+        # Enforce 2 profession limit
+        names = [p["name"] for p in profile["professions"]]
+        if profession not in names and len(names) >= 2:
+            return False
 
-        # Check if they already have 2 professions
-        if profession not in [p["name"] for p in profile["professions"]] and len(profile["professions"]) >= 2:
-            return False  # Too many professions selected
-
-        # Update profile data
-        profile["professions"] = [
-            p for p in profile["professions"] if p["name"] != profession
-        ]
-        profile["professions"].append({"name": profession, "tier": tier})
+        # Replace if exists, otherwise add
+        profile["professions"] = [p for p in profile["professions"] if p["name"] != profession]
+        profile["professions"].append({"name": profession, "tier": str(max(1, min(int(tier), 5)))})
         save_profiles(self.profiles)
 
-        # Update global artisan registry
-        if profession not in self.artisan_registry:
-            self.artisan_registry[profession] = {}
-        self.artisan_registry[profession][user_id_str] = tier
+        # Update registry
+        self.artisan_registry.setdefault(profession, {})[uid] = str(tier)
         save_registry(self.artisan_registry)
         return True
-    
-    def remove_user_profession(self, user_id, profession):
-        """Remove a profession from user (updates profile + registry)."""
-        user_id_str = str(user_id)
-        # normalize
-        profession = PROFESSION_ALIASES.get(profession, profession)
 
-        # profiles.json
+    def remove_user_profession(self, user_id: int, profession: str) -> bool:
+        uid = str(user_id)
+        profession = self._norm(profession)
+
         profile = self.get_profile(user_id)
         before = len(profile.get("professions", []))
         profile["professions"] = [p for p in profile.get("professions", []) if p["name"] != profession]
-        if len(profile["professions"]) != before:
+        changed = len(profile["professions"]) != before
+        if changed:
             save_profiles(self.profiles)
 
-        # artisan_registry.json
-        if profession in self.artisan_registry and user_id_str in self.artisan_registry[profession]:
-            del self.artisan_registry[profession][user_id_str]
+        if profession in self.artisan_registry and uid in self.artisan_registry[profession]:
+            del self.artisan_registry[profession][uid]
             if not self.artisan_registry[profession]:
-                # Cleanup empty profession bucket (optional)
                 self.artisan_registry.pop(profession, None)
             save_registry(self.artisan_registry)
-    # -----------------------------
-    # Get Player Professions
-    # -----------------------------
-    def get_user_professions(self, user_id):
-        profile = self.get_profile(user_id)
-        return profile.get("professions", [])
+        return changed
 
-    # -----------------------------
-    # Profession Legend Embed
-    # -----------------------------
-    def get_tier_legend(self):
-        embed = discord.Embed(
-            title="📜 Profession Tier Legend",
-            description="Color indicators for artisan tiers",
-            color=discord.Color.blurple()
-        )
-        for tier, emoji in TIER_COLORS.items():
-            label = {
-                "1": "Novice",
-                "2": "Apprentice",
-                "3": "Journeyman",
-                "4": "Master",
-                "5": "Grandmaster"
-            }[tier]
-            embed.add_field(name=f"{emoji} {label}", value=f"Tier {tier}", inline=True)
-        return embed
+    # ---------- commands ----------
+    @commands.hybrid_command(name="professions", description="View your current professions.")
+    async def professions_cmd(self, ctx: commands.Context):
+        embed = self.build_user_professions_embed(ctx.author)
+        await ctx.reply(embed=embed, ephemeral=True)
 
-    # -----------------------------
-    # View Current Professions (Guild-Wide)
-    # -----------------------------
-    async def format_artisan_registry(self, bot: commands.Bot, guild_id: int = None):
-        """Guild-wide professions overview."""
-        guild = bot.get_guild(guild_id) if guild_id else None
-        embed = discord.Embed(
-            title="🏆 Guild Artisan Registry",
-            description="Current artisans & their tiers",
-            color=discord.Color.gold()
-        )
+    @commands.hybrid_command(name="setprofession", description="Set or update your profession and tier.")
+    async def set_profession_cmd(self, ctx: commands.Context, profession: str, tier: int):
+        ok = self.set_user_profession(ctx.author.id, profession, str(tier))
+        if ok:
+            await ctx.reply(f"✅ Set **{self._norm(profession)}** to **Tier {max(1,min(tier,5))}**.", ephemeral=True)
+            # refresh hub panels
+            if getattr(ctx, "interaction", None):
+                await refresh_hub(ctx.interaction, ctx.author.id, section="professions")
+                await refresh_hub(ctx.interaction, ctx.author.id, section="profile")
+        else:
+            await ctx.reply("⚠️ You can only have up to **2 professions**.", ephemeral=True)
 
-        for profession, members in self.artisan_registry.items():
-            if not members:
-                continue
-            lines = []
-            for user_id, tier in members.items():
-                member = guild.get_member(int(user_id)) if guild else None
-                name = member.display_name if member else f"User {user_id}"
-                color = TIER_COLORS.get(str(tier), "⚪")
-                lines.append(f"{color} {name} — Tier {tier}")
-            embed.add_field(
-                name=f"{profession} ({len(members)} members)",
-                value="\n".join(lines),
-                inline=False
-            )
-        return [embed]
+    @commands.hybrid_command(name="removeprofession", description="Remove one of your professions.")
+    async def remove_profession_cmd(self, ctx: commands.Context, profession: str):
+        changed = self.remove_user_profession(ctx.author.id, profession)
+        if changed:
+            await ctx.reply(f"🗑️ Removed **{self._norm(profession)}**.", ephemeral=True)
+            if getattr(ctx, "interaction", None):
+                await refresh_hub(ctx.interaction, ctx.author.id, section="professions")
+                await refresh_hub(ctx.interaction, ctx.author.id, section="profile")
+        else:
+            await ctx.reply("⚠️ You don't have that profession.", ephemeral=True)
+
+    @commands.hybrid_command(name="tiers", description="Show profession tier legend.")
+    async def tiers_cmd(self, ctx: commands.Context):
+        embed = discord.Embed(title="📜 Profession Tier Legend", color=discord.Color.blurple())
+        labels = {"1": "Novice", "2": "Apprentice", "3": "Journeyman", "4": "Master", "5": "Grandmaster"}
+        for t, emoji in TIER_COLORS.items():
+            embed.add_field(name=f"{emoji} {labels[t]}", value=f"**Tier {t}**", inline=True)
+        await ctx.reply(embed=embed, ephemeral=True)
 
 
-# ======================================================
-# Cog Setup
-# ======================================================
 async def setup(bot):
     await bot.add_cog(Professions(bot))
