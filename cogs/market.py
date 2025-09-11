@@ -2,61 +2,183 @@ import discord
 from discord.ext import commands
 import json
 import os
-class MarketMenu(discord.ui.View):
+
+MARKET_FILE = "data/market.json"
+
+def load_market():
+    if not os.path.exists(MARKET_FILE):
+        return []
+    with open(MARKET_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_market(data):
+    with open(MARKET_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+# ======================================================
+# Market Cog (Data Management)
+# ======================================================
+class Market(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.market = load_market()
+
+    def get_user_listings(self, user_id):
+        return [item for item in self.market if item["seller_id"] == str(user_id)]
+
+    def add_listing(self, item_name, price, village, seller_id, seller_name):
+        entry = {
+            "item": item_name,
+            "price": price,
+            "village": village,
+            "seller": seller_name,
+            "seller_id": str(seller_id),
+            "link": f"https://ashescodex.com/search?query={item_name.replace(' ', '+')}"
+        }
+        self.market.append(entry)
+        save_market(self.market)
+
+    def remove_listing(self, seller_id, item_name):
+        self.market = [
+            item for item in self.market
+            if not (item["seller_id"] == str(seller_id) and item["item"] == item_name)
+        ]
+        save_market(self.market)
+
+    def get_all_listings(self):
+        return self.market
+
+# ======================================================
+# Market Menu UI
+# ======================================================
+class MarketMenu(discord.ui.View):  # <-- ✅ MUST EXIST
     def __init__(self, market_cog, user):
         super().__init__(timeout=None)
         self.market_cog = market_cog
         self.user = user
 
+    # 📜 Browse Market Listings
     @discord.ui.button(label="📜 Browse Market", style=discord.ButtonStyle.primary)
     async def browse_market(self, interaction: discord.Interaction, button: discord.ui.Button):
         listings = self.market_cog.get_all_listings()
         if not listings:
-            return await interaction.response.send_message("⚠️ There are no active market listings.", ephemeral=True)
-
-        per_page = 5
-
-        async def render(i: discord.Interaction, page: int, first: bool):
-            total_pages = max(1, (len(listings) + per_page - 1) // per_page)
-            start, end = page * per_page, page * per_page + per_page
-            page_listings = listings[start:end]
-
-            embed = discord.Embed(
-                title=f"💰 Market Listings (Page {page+1}/{total_pages})",
-                description="Current player-submitted prices",
-                color=discord.Color.gold()
+            await interaction.response.send_message(
+                "⚠️ There are no active market listings.",
+                ephemeral=True
             )
-            for entry in page_listings:
-                embed.add_field(
-                    name=f"🛒 {entry['item']} — {entry['price']}g",
-                    value=f"📍 **Village**: {entry['village']}\n"
-                            f"👤 **Seller**: {entry['seller']}\n"
-                            f"[🔗 View on Ashes Codex]({entry['link']})",
-                    inline=False
-                )
+            return
 
-            view = discord.ui.View(timeout=None)
+        embed = discord.Embed(
+            title="💰 Market Listings",
+            description="Current player-submitted prices",
+            color=discord.Color.gold()
+        )
 
-            if page > 0:
-                prev_btn = discord.ui.Button(label="⬅ Prev", style=discord.ButtonStyle.secondary)
-                async def prev_cb(ii): await render(ii, page-1, False)
-                prev_btn.callback = prev_cb
-                view.add_item(prev_btn)
+        for entry in listings[:10]:
+            embed.add_field(
+                name=f"🛒 {entry['item']} — {entry['price']}g",
+                value=f"📍 **Village**: {entry['village']}\n"
+                      f"👤 **Seller**: {entry['seller']}\n"
+                      f"[🔗 View on Ashes Codex]({entry['link']})",
+                inline=False
+            )
 
-            if end < len(listings):
-                next_btn = discord.ui.Button(label="Next ➡", style=discord.ButtonStyle.secondary)
-                async def next_cb(ii): await render(ii, page+1, False)
-                next_btn.callback = next_cb
-                view.add_item(next_btn)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
-            close_btn = discord.ui.Button(label="❌ Close", style=discord.ButtonStyle.danger)
-            async def close_cb(ii): await ii.response.edit_message(content="Menu closed.", view=None, embed=None)
-            close_btn.callback = close_cb
-            view.add_item(close_btn)
+    # ➕ Add Listing
+    @discord.ui.button(label="➕ Add Listing", style=discord.ButtonStyle.success)
+    async def add_listing_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        modal = AddListingModal(self.market_cog, self.user)
+        await interaction.response.send_modal(modal)
 
-            if first:
-                await i.response.send_message(embed=embed, view=view, ephemeral=True)
-            else:
-                await i.response.edit_message(embed=embed, view=view)
+    # ❌ Remove Listing
+    @discord.ui.button(label="❌ Remove Listing", style=discord.ButtonStyle.danger)
+    async def remove_listing_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_listings = self.market_cog.get_user_listings(interaction.user.id)
+        if not user_listings:
+            await interaction.response.send_message(
+                "⚠️ You don’t have any active listings to remove.",
+                ephemeral=True
+            )
+            return
 
-        await render(interaction, 0, True)
+        options = [
+            discord.SelectOption(label=entry["item"], value=entry["item"])
+            for entry in user_listings
+        ]
+
+        dropdown = discord.ui.Select(
+            placeholder="Select a listing to remove...",
+            options=options,
+            min_values=1,
+            max_values=1
+        )
+
+        view = discord.ui.View(timeout=None)
+
+        async def dropdown_callback(select_interaction: discord.Interaction):
+            item_name = dropdown.values[0]
+            self.market_cog.remove_listing(select_interaction.user.id, item_name)
+            embed = discord.Embed(
+                title="✅ Listing Removed",
+                description=f"You removed **{item_name}** from the market.",
+                color=discord.Color.red()
+            )
+            await select_interaction.response.send_message(embed=embed, ephemeral=True)
+
+        dropdown.callback = dropdown_callback
+        view.add_item(dropdown)
+
+        await interaction.response.send_message(
+            content="Select a listing to remove:",
+            view=view,
+            ephemeral=True
+        )
+
+# ======================================================
+# Add Listing Modal
+# ======================================================
+class AddListingModal(discord.ui.Modal, title="➕ Add Market Listing"):
+    def __init__(self, market_cog, user):
+        super().__init__()
+        self.market_cog = market_cog
+        self.user = user
+
+        self.item_name = discord.ui.TextInput(label="Item Name", placeholder="Example: Ironwood Plank", required=True)
+        self.price = discord.ui.TextInput(label="Sale Price (gold)", placeholder="Example: 175", required=True)
+        self.village = discord.ui.TextInput(label="Village Name", placeholder="Example: Riverlands", required=True)
+
+        self.add_item(self.item_name)
+        self.add_item(self.price)
+        self.add_item(self.village)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            price = int(self.price.value)
+        except ValueError:
+            await interaction.response.send_message(
+                "⚠️ Invalid price format. Please enter a number.",
+                ephemeral=True
+            )
+            return
+
+        self.market_cog.add_listing(
+            self.item_name.value,
+            price,
+            self.village.value,
+            self.user.id,
+            self.user.display_name
+        )
+
+        embed = discord.Embed(
+            title="✅ Listing Added",
+            description=f"**{self.item_name.value}** added for **{price}g**.\n📍 Village: **{self.village.value}**",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+# ======================================================
+# Cog Setup
+# ======================================================
+async def setup(bot):
+    await bot.add_cog(Market(bot))
