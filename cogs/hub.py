@@ -117,11 +117,33 @@ class HubView(discord.ui.View):
         self.add_item(self._NavBtn(trades_label, "trades", discord.ButtonStyle.secondary))
 
         
-        def attach_section_controls(self, section: str, user_id: int):"""
-        Ask the relevant cog for a per-section control View and merge its items here.
-        This keeps nav on the first row; section controls are appended below.
-        """
-        # Quick actions for Home
+    class HubView(discord.ui.View):
+        def __init__(self, cog: "Hub", user_id: int, section: str = "home", debug: bool = False):
+            super().__init__(timeout=600)
+            self.cog = cog
+            self.user_id = user_id
+            self.section = section
+            self.debug = debug
+
+            # Compute badges for nav labels
+            counts = self.cog.get_dashboard_counts(user_id)
+            mailbox_label = "📬 Mailbox" + (f" ({counts['mail_unread']})" if counts["mail_unread"] > 0 else "")
+            market_label  = "💰 Market" + (f" ({counts['market_wishlist_matches']})" if counts["market_wishlist_matches"] > 0 else "")
+            trades_label  = "📦 Trades" + (f" ({counts['trade_wishlist_matches']})" if counts["trade_wishlist_matches"] > 0 else "")
+
+            # Top nav
+            self.add_item(self._NavBtn("🏰 Home", "home", discord.ButtonStyle.primary))
+            self.add_item(self._NavBtn("👤 Profile", "profile", discord.ButtonStyle.secondary))
+            self.add_item(self._NavBtn("🛠️ Professions", "professions", discord.ButtonStyle.secondary))
+            self.add_item(self._NavBtn("📜 Recipes", "recipes", discord.ButtonStyle.secondary))
+            self.add_item(self._NavBtn(market_label, "market", discord.ButtonStyle.success))
+            self.add_item(self._NavBtn(mailbox_label, "mailbox", discord.ButtonStyle.secondary))
+            self.add_item(self._NavBtn("📜 Registry", "registry", discord.ButtonStyle.secondary))
+            self.add_item(self._NavBtn(trades_label, "trades", discord.ButtonStyle.secondary))
+
+    # <-- FIX: this method is at class level, not nested inside __init__
+    def attach_section_controls(self, section: str, user_id: int):
+        """Ask the relevant cog for a per-section control View and merge its items here."""
         if section == "home":
             quick = self.cog.build_home_quick_actions(user_id)
             if quick:
@@ -136,7 +158,6 @@ class HubView(discord.ui.View):
             "mailbox": ("Mailbox", "build_mailbox_buttons"),
             "registry": ("Registry", "build_registry_buttons"),
             "trades": ("Trades", "build_trades_buttons"),
-            
         }
 
         if section not in cog_map:
@@ -151,8 +172,8 @@ class HubView(discord.ui.View):
                     for item in subview.children:
                         self.add_item(item)
             except Exception as ex:
-                # 👇 temporary debug so you see if something fails
                 print(f"[Hub] Failed to attach controls for {cog_name}.{method_name}: {ex}")
+
 
 
     class _NavBtn(discord.ui.Button):
