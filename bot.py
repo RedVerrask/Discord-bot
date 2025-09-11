@@ -44,9 +44,10 @@ class AshesBot(commands.Bot):
         # Register persistent views
         try:
             from cogs.hub import HubView
-            
+            self.add_view(HubView(cog=None, user_id=0))  # registers buttons persistently
         except Exception as e:
             logger.warning(f"⚠️ Could not register HubView: {e}")
+
 
         # Sync slash commands
         synced = await self.tree.sync()
