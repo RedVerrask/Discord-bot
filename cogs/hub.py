@@ -114,12 +114,8 @@ class HubView(discord.ui.View):
         self.add_item(self._NavBtn("📜 Registry", "registry", discord.ButtonStyle.secondary))
         self.add_item(self._NavBtn(trades_label, "trades", discord.ButtonStyle.secondary))
 
-        # Utility
-        if section != "home":
-            self.add_item(self._BackBtn())
-
-    def attach_section_controls(self, section: str, user_id: int):
-        """
+        
+        def attach_section_controls(self, section: str, user_id: int):"""
         Ask the relevant cog for a per-section control View and merge its items here.
         This keeps nav on the first row; section controls are appended below.
         """
@@ -139,18 +135,22 @@ class HubView(discord.ui.View):
             "registry": ("Registry", "build_registry_buttons"),
             "trades": ("Trades", "build_trades_buttons"),
         }
+
         if section not in cog_map:
             return
+
         cog_name, method_name = cog_map[section]
         cog = self.cog.bot.get_cog(cog_name)
         if cog and hasattr(cog, method_name):
             try:
-                subview = getattr(cog, method_name)(user_id)  # expected to return a discord.ui.View
+                subview = getattr(cog, method_name)(user_id)
                 if isinstance(subview, discord.ui.View):
                     for item in subview.children:
                         self.add_item(item)
-            except Exception:
-                pass
+            except Exception as ex:
+                # 👇 temporary debug so you see if something fails
+                print(f"[Hub] Failed to attach controls for {cog_name}.{method_name}: {ex}")
+
 
     class _NavBtn(discord.ui.Button):
         def __init__(self, label: str, target: str, style: discord.ButtonStyle):
@@ -169,16 +169,6 @@ class HubView(discord.ui.View):
             new_view.attach_section_controls(self.target, v.user_id)
             await interaction.response.edit_message(embed=embed, view=new_view)
 
-    class _BackBtn(discord.ui.Button):
-        def __init__(self):
-            super().__init__(label="⬅ Back to Home", style=discord.ButtonStyle.secondary)
-
-        async def callback(self, interaction: discord.Interaction):
-            v: HubView = self.view  # type: ignore
-            embed = await v.cog.render_section(interaction, v.user_id, "home", v.debug)
-            new_view = HubView(v.cog, v.user_id, section="home", debug=v.debug)
-            new_view.attach_section_controls("home", v.user_id)
-            await interaction.response.edit_message(embed=embed, view=new_view)
 
 
 # =========================

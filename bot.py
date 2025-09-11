@@ -56,13 +56,18 @@ class AshesBot(commands.Bot):
 async def load_cogs(bot: commands.Bot):
     """Load all cogs safely, skipping missing ones."""
     cogs = [
-        "cogs.professions",
-        "cogs.recipes",
-        "cogs.profile",
-        "cogs.market",
-        "cogs.hub",
-        # "cogs.mail",     # ⬅ coming in Phase 3
-        # "cogs.registry", # ⬅ coming in Phase 3
+        # bot.py (inside load_cogs)
+cogs = [
+    "cogs.profile",
+    "cogs.professions",
+    "cogs.recipes",
+    "cogs.market",     # if you have it; ok to fail
+    "cogs.mailbox",    # ✅ correct name (not cogs.mail)
+    "cogs.trades",     # ✅ make sure trades loads
+    # "cogs.registry", # only if/when you add this file
+    "cogs.hub",
+]
+
     ]
     for ext in cogs:
         try:
