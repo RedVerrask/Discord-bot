@@ -49,7 +49,7 @@ class RecipesMainView(discord.ui.View):
     # ================================
     # Profession Filtered Recipes
     # ================================
-    @discord.ui.button(label="📜 Browse My Recipes", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="📜 Browse My Recipes", style=discord.ButtonStyle.primary, custom_id="recipes_browse")
     async def browse_my_recipes(self, interaction: discord.Interaction, button: discord.ui.Button):
         profile_cog = interaction.client.get_cog("Profile")
         professions_cog = interaction.client.get_cog("Professions")
@@ -70,12 +70,7 @@ class RecipesMainView(discord.ui.View):
         ]
 
         view = discord.ui.View(timeout=None)
-        dropdown = discord.ui.Select(
-            placeholder="Select a profession to browse recipes...",
-            options=options,
-            min_values=1,
-            max_values=1
-        )
+        dropdown = discord.ui.Select(placeholder="Select a profession to browse recipes...", options=options, min_values=1, max_values=1, custom_id="recipes_profession_dropdown")
 
         async def dropdown_callback(select_interaction: discord.Interaction):
             selected_profession = dropdown.values[0]
@@ -93,7 +88,7 @@ class RecipesMainView(discord.ui.View):
     # ================================
     # Global Recipe Search
     # ================================
-    @discord.ui.button(label="🔍 Search Recipes", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="🔍 Search Recipes", style=discord.ButtonStyle.secondary, custom_id="recipes_search")
     async def search_recipes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         modal = RecipeSearchModal(self.recipes_cog)
         await interaction.response.send_modal(modal)

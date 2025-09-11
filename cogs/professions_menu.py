@@ -53,7 +53,8 @@ class ProfessionsMenu(discord.ui.View):
             placeholder="Select a profession to remove...",
             options=options,
             min_values=1,
-            max_values=1
+            max_values=1,
+            custom_id="prof_remove_dropdown"
         )
 
         async def dropdown_callback(select_interaction: discord.Interaction):
@@ -120,7 +121,8 @@ class ProfessionsMenu(discord.ui.View):
             placeholder=f"Select your {category} profession...",
             options=options,
             min_values=1,
-            max_values=1
+            max_values=1,
+            custom_id="prof_select_dropdown"
         )
 
         async def dropdown_callback(select_interaction: discord.Interaction):
@@ -164,7 +166,8 @@ class ProfessionsMenu(discord.ui.View):
             placeholder=f"Select your tier for {profession}",
             options=tiers,
             min_values=1,
-            max_values=1
+            max_values=1,
+            custom_id="prof_tier_dropdown"
         )
 
         async def dropdown_callback(select_interaction: discord.Interaction):

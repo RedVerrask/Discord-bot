@@ -58,7 +58,7 @@ class MarketMenu(discord.ui.View):  # <-- ✅ MUST EXIST
         self.user = user
 
     # 📜 Browse Market Listings
-    @discord.ui.button(label="📜 Browse Market", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="📜 Browse Market", style=discord.ButtonStyle.primary, custom_id="market_browse")
     async def browse_market(self, interaction: discord.Interaction, button: discord.ui.Button):
         listings = self.market_cog.get_all_listings()
         if not listings:
@@ -86,13 +86,13 @@ class MarketMenu(discord.ui.View):  # <-- ✅ MUST EXIST
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # ➕ Add Listing
-    @discord.ui.button(label="➕ Add Listing", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="➕ Add Listing", style=discord.ButtonStyle.success, custom_id="market_add")
     async def add_listing_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         modal = AddListingModal(self.market_cog, self.user)
         await interaction.response.send_modal(modal)
 
     # ❌ Remove Listing
-    @discord.ui.button(label="❌ Remove Listing", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="❌ Remove Listing", style=discord.ButtonStyle.danger, custom_id="market_remove")
     async def remove_listing_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_listings = self.market_cog.get_user_listings(interaction.user.id)
         if not user_listings:
@@ -111,7 +111,8 @@ class MarketMenu(discord.ui.View):  # <-- ✅ MUST EXIST
             placeholder="Select a listing to remove...",
             options=options,
             min_values=1,
-            max_values=1
+            max_values=1,
+            custom_id="market_remove_dropdown"
         )
 
         view = discord.ui.View(timeout=None)

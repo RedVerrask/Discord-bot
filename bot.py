@@ -59,11 +59,16 @@ class AshesBot(commands.Bot):
         await load_cogs(self)
 
         # Register persistent HomeView
-        self.add_view(HomeView())  # fetch cogs on-demand inside the view
+        self.add_view(HomeView(
+            professions_cog=self.get_cog("Professions"),
+            recipes_cog=self.get_cog("Recipes"),
+            market_cog=self.get_cog("Market")
+        ))  # fetch cogs on-demand inside the view
 
         # (you can keep slash-sync for now, or remove if you want no slash cmds at all)
         synced = await self.tree.sync()
         logger.info(f"🌐 Synced {len(synced)} slash commands globally.")
+        logger.info("✅ Persistent views registered successfully.")
 
 async def load_cogs(bot):
     cogs = ["professions", "recipes", "profile", "market"]
