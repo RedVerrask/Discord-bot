@@ -5,6 +5,17 @@ import discord
 from discord.ext import commands
 from cogs.views import HomeView
 
+import logging
+
+# Enable advanced debug logging
+logging.basicConfig(
+    level=logging.DEBUG,  # Change to logging.INFO for less spam
+    format="[%(asctime)s] [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+logger = logging.getLogger("AshesBot")
+
 # ------------------------------------------------------
 # Load Token from Environment (Railway handles this)
 # ------------------------------------------------------
@@ -19,7 +30,7 @@ if not TOKEN:
 # ------------------------------------------------------
 # Logging Setup
 # ------------------------------------------------------
-LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.DEBUG
 logger = logging.getLogger("AshesBot")
 logger.setLevel(LOG_LEVEL)
 console_handler = logging.StreamHandler()
@@ -132,9 +143,13 @@ if not any(cmd.name == "debug-recipes" for cmd in bot.tree.get_commands()):
 # Events
 # ------------------------------------------------------
 @bot.event
+@bot.event
 async def on_ready():
     logger.info(f"✅ Logged in as {bot.user} ({bot.user.id})")
     logger.info(f"🌐 Connected to {len(bot.guilds)} servers.")
+    logger.info("📜 Loaded Cogs: %s", list(bot.cogs.keys()))
+    logger.info("📌 Slash Commands: %s", [cmd.name for cmd in bot.tree.get_commands()])
+
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -148,6 +163,32 @@ async def on_error(event, *args, **kwargs):
 # ------------------------------------------------------
 # Run Bot
 # ------------------------------------------------------
+@bot.event
+async def on_error(event, *args, **kwargs):
+    logger.exception(f"💥 Unhandled error in event: {event}")
+
+@bot.event
+async def on_command_error(ctx, error):
+    logger.error(f"⚠️ Command failed: {error}")
+    await ctx.send(f"⚠️ Something went wrong: `{error}`", delete_after=15)
+
+@bot.tree.command(name="debug", description="Check the bot's current state")
+async def debug_command(interaction: discord.Interaction):
+    try:
+        loaded_cogs = list(bot.cogs.keys())
+        commands_list = [cmd.name for cmd in bot.tree.get_commands()]
+
+        embed = discord.Embed(title="🔍 Debug Info", color=discord.Color.blurple())
+        embed.add_field(name="Loaded Cogs", value=", ".join(loaded_cogs) or "⚠️ None", inline=False)
+        embed.add_field(name="Slash Commands", value=", ".join(commands_list) or "⚠️ None", inline=False)
+        embed.add_field(name="Latency", value=f"{round(bot.latency * 1000)}ms", inline=False)
+
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    except Exception as e:
+        logger.exception("Debug command failed!")
+        await interaction.response.send_message(f"⚠️ Debug failed: `{e}`", ephemeral=True)
+
+
 async def main():
     async with bot:
         await bot.start(TOKEN)
