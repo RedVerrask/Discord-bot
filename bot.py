@@ -41,32 +41,42 @@ class AshesBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        """Load cogs, add persistent views, and sync commands."""
+        # Ensure data dir exists
+        os.makedirs("data", exist_ok=True)
+
+        # Load cogs
         await load_cogs(self)
 
         # Register persistent HomeView
-        professions_cog = self.get_cog("Professions")
-        recipes_cog = self.get_cog("Recipes")
-        if professions_cog and recipes_cog:
-            self.add_view(HomeView(professions_cog, recipes_cog))
+        self.add_view(HomeView())  # fetch cogs on-demand inside the view
 
-        # Sync slash commands globally
+        # (you can keep slash-sync for now, or remove if you want no slash cmds at all)
         synced = await self.tree.sync()
         logger.info(f"🌐 Synced {len(synced)} slash commands globally.")
 
-bot = AshesBot()
-
-# ------------------------------------------------------
-# Load Cogs Dynamically
-# ------------------------------------------------------
-async def load_cogs(bot: AshesBot):
-    cogs = ["professions", "recipes"]
+async def load_cogs(bot):
+    cogs = ["professions", "recipes", "profile", "market"]
     for cog in cogs:
         try:
             await bot.load_extension(f"cogs.{cog}")
             logger.info(f"🔹 Loaded cog: {cog}")
         except Exception as e:
             logger.error(f"❌ Failed to load cog '{cog}': {e}")
+
+bot = AshesBot()
+
+# ------------------------------------------------------
+# Load Cogs Dynamically
+# ------------------------------------------------------
+async def load_cogs(bot):
+        cogs = ["professions", "recipes", "profile", "market"]  # ⬅ Added market + profile
+        for cog in cogs:
+            try:
+                await bot.load_extension(f"cogs.{cog}")
+                logger.info(f"🔹 Loaded cog: {cog}")
+            except Exception as e:
+                logger.error(f"❌ Failed to load cog '{cog}': {e}")
+
 
 # ------------------------------------------------------
 # Slash Commands

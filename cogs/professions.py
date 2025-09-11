@@ -1,170 +1,177 @@
 import discord
 from discord.ext import commands
-import os
 import json
+import os
 
+PROFILES_FILE = "data/profiles.json"
+REGISTRY_FILE = "data/artisan_registry.json"
+
+# Profession aliases for syncing with recipes.json
+PROFESSION_ALIASES = {
+    "Jeweler": "Jewelry",
+    "Scribe": "Scribing",
+    "Crafting": "Arcane Engineering"
+}
+
+TIER_COLORS = {
+    "1": "⚪",  # Novice
+    "2": "🟢",  # Apprentice
+    "3": "🔵",  # Journeyman
+    "4": "🟣",  # Master
+    "5": "🟠"   # Grandmaster
+}
+
+
+# ======================================================
+# Utility: Profiles + Registry Sync
+# ======================================================
+def load_profiles():
+    if not os.path.exists(PROFILES_FILE):
+        return {}
+    with open(PROFILES_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_profiles(data):
+    with open(PROFILES_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+def load_registry():
+    if not os.path.exists(REGISTRY_FILE):
+        return {}
+    with open(REGISTRY_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_registry(data):
+    with open(REGISTRY_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+
+# ======================================================
+# Professions Cog
+# ======================================================
 class Professions(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.REGISTRY_FILE = "artisan_registry.json"
-        self.artisan_registry = self.load_registry()
+        self.profiles = load_profiles()
+        self.artisan_registry = load_registry()
 
-    # ------------------------------------------------------
-    # Registry Loader / Saver
-    # ------------------------------------------------------
-    def load_registry(self):
-        """Loads the artisan registry from file or initializes defaults."""
-        if os.path.exists(self.REGISTRY_FILE):
-            with open(self.REGISTRY_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        return {
-            "Fishing": {}, "Herbalism": {}, "Hunting": {}, "Lumberjacking": {}, "Mining": {},
-            "Alchemy": {}, "Animal Husbandry": {}, "Cooking": {}, "Farming": {}, "Lumber Milling": {},
-            "Metalworking": {}, "Stonemasonry": {}, "Tanning": {}, "Weaving": {},
-            "Arcane Engineering": {}, "Armor Smithing": {}, "Carpentry": {}, "Jewelry": {},
-            "Leatherworking": {}, "Scribing": {}, "Tailoring": {}, "Weapon Smithing": {},
-        }
+    # -----------------------------
+    # Get Player Profile
+    # -----------------------------
+    def get_profile(self, user_id):
+        user_id = str(user_id)
+        if user_id not in self.profiles:
+            self.profiles[user_id] = {"professions": []}
+            save_profiles(self.profiles)
+        return self.profiles[user_id]
 
-    def save_registry(self):
-        """Saves the artisan registry to file."""
-        with open(self.REGISTRY_FILE, "w", encoding="utf-8") as f:
-            json.dump(self.artisan_registry, f, indent=4)
+    # -----------------------------
+    # Assign / Update Profession
+    # -----------------------------
+    def set_user_profession(self, user_id, profession, tier):
+        """Assign or update profession, enforcing 2 max limit."""
+        user_id_str = str(user_id)
+        profile = self.get_profile(user_id)
 
-    # ------------------------------------------------------
-    # Profession Assignment
-    # ------------------------------------------------------
-    def set_user_profession(self, user_id: int, profession: str, tier: str):
-        """
-        Assigns or updates a user's profession and tier.
-        Now allows MULTIPLE professions instead of removing previous ones.
-        """
+        # Alias mapping
+        profession = PROFESSION_ALIASES.get(profession, profession)
+
+        # Check if they already have 2 professions
+        if profession not in [p["name"] for p in profile["professions"]] and len(profile["professions"]) >= 2:
+            return False  # Too many professions selected
+
+        # Update profile data
+        profile["professions"] = [
+            p for p in profile["professions"] if p["name"] != profession
+        ]
+        profile["professions"].append({"name": profession, "tier": tier})
+        save_profiles(self.profiles)
+
+        # Update global artisan registry
         if profession not in self.artisan_registry:
             self.artisan_registry[profession] = {}
-        self.artisan_registry[profession][str(user_id)] = tier
-        self.save_registry()
-
-    # ------------------------------------------------------
-    # Profession Retrieval
-    # ------------------------------------------------------
-    def get_user_professions(self, user_id: int):
-        """Returns a list of professions the user currently has."""
+        self.artisan_registry[profession][user_id_str] = tier
+        save_registry(self.artisan_registry)
+        return True
+    
+    def remove_user_profession(self, user_id, profession):
+        """Remove a profession from user (updates profile + registry)."""
         user_id_str = str(user_id)
-        return [prof for prof, members in self.artisan_registry.items() if user_id_str in members]
+        # normalize
+        profession = PROFESSION_ALIASES.get(profession, profession)
 
-    def get_user_tier(self, user_id: int, profession: str):
-        """Returns the user's tier for a given profession, or None."""
-        return self.artisan_registry.get(profession, {}).get(str(user_id))
+        # profiles.json
+        profile = self.get_profile(user_id)
+        before = len(profile.get("professions", []))
+        profile["professions"] = [p for p in profile.get("professions", []) if p["name"] != profession]
+        if len(profile["professions"]) != before:
+            save_profiles(self.profiles)
 
-    def has_profession(self, user_id: int):
-        """Checks if a user has at least one profession."""
-        return bool(self.get_user_professions(user_id))
+        # artisan_registry.json
+        if profession in self.artisan_registry and user_id_str in self.artisan_registry[profession]:
+            del self.artisan_registry[profession][user_id_str]
+            if not self.artisan_registry[profession]:
+                # Cleanup empty profession bucket (optional)
+                self.artisan_registry.pop(profession, None)
+            save_registry(self.artisan_registry)
+    # -----------------------------
+    # Get Player Professions
+    # -----------------------------
+    def get_user_professions(self, user_id):
+        profile = self.get_profile(user_id)
+        return profile.get("professions", [])
 
-    def can_learn_recipe(self, user_id: int, profession: str, required_level: int):
-        """
-        Returns True if the user has the profession and meets the tier requirement.
-        Recipes can use this to restrict access.
-        """
-        tier = self.get_user_tier(user_id, profession)
-        if tier is None:
-            return False  # Doesn't have the profession at all
-        try:
-            return int(tier) >= int(required_level)
-        except ValueError:
-            return False
-
-    # ------------------------------------------------------
-    # Profession Registry Formatting (Embeds)
-    # ------------------------------------------------------
-    async def format_artisan_registry(self, bot: commands.Bot, guild_id: int = None) -> list:
-        """Creates two embeds — filled & empty professions for the guild."""
-        profession_icons = {
-            "Fishing": "🎣", "Herbalism": "🌿", "Hunting": "🏹", "Lumberjacking": "🪓", "Mining": "⛏️",
-            "Alchemy": "⚗️", "Animal Husbandry": "🐄", "Cooking": "🍳", "Farming": "🌾", "Lumber Milling": "🪵",
-            "Metalworking": "⚒️", "Stonemasonry": "🧱", "Tanning": "🪶", "Weaving": "🧵",
-            "Arcane Engineering": "🔮", "Armor Smithing": "🛡️", "Carpentry": "🪑", "Jewelry": "💍",
-            "Leatherworking": "👢", "Scribing": "📜", "Tailoring": "🧶", "Weapon Smithing": "⚔️",
-        }
-
-        tier_colors = {
-            "1": "⚪",  # Novice
-            "2": "🟢",  # Apprentice
-            "3": "🔵",  # Journeyman
-            "4": "🟣",  # Master
-            "5": "🟠"   # Grandmaster
-        }
-
-        categories = {
-            "Gatherers": ["Fishing", "Herbalism", "Hunting", "Lumberjacking", "Mining"],
-            "Processors": ["Alchemy", "Animal Husbandry", "Cooking", "Farming", "Lumber Milling",
-                           "Metalworking", "Stonemasonry", "Tanning", "Weaving"],
-            "Crafters": ["Arcane Engineering", "Armor Smithing", "Carpentry", "Jewelry",
-                         "Leatherworking", "Scribing", "Tailoring", "Weapon Smithing"],
-        }
-
-        filled_embed = discord.Embed(
-            title="📜 Current Professions",
-            description="Here are the currently registered professions:",
+    # -----------------------------
+    # Profession Legend Embed
+    # -----------------------------
+    def get_tier_legend(self):
+        embed = discord.Embed(
+            title="📜 Profession Tier Legend",
+            description="Color indicators for artisan tiers",
             color=discord.Color.blurple()
         )
+        for tier, emoji in TIER_COLORS.items():
+            label = {
+                "1": "Novice",
+                "2": "Apprentice",
+                "3": "Journeyman",
+                "4": "Master",
+                "5": "Grandmaster"
+            }[tier]
+            embed.add_field(name=f"{emoji} {label}", value=f"Tier {tier}", inline=True)
+        return embed
 
-        empty_embed = discord.Embed(
-            title="📭 Vacant Professions",
-            description="Professions with no registered members:",
-            color=discord.Color.greyple()
+    # -----------------------------
+    # View Current Professions (Guild-Wide)
+    # -----------------------------
+    async def format_artisan_registry(self, bot: commands.Bot, guild_id: int = None):
+        """Guild-wide professions overview."""
+        guild = bot.get_guild(guild_id) if guild_id else None
+        embed = discord.Embed(
+            title="🏆 Guild Artisan Registry",
+            description="Current artisans & their tiers",
+            color=discord.Color.gold()
         )
 
-        guild = bot.get_guild(guild_id) if guild_id else None
-
-        for category_name, professions in categories.items():
-            filled_text = ""
-            empty_text = ""
-
-            for prof in professions:
-                members = self.artisan_registry.get(prof, {})
-                if members:
-                    member_lines = []
-                    for user_id, tier in members.items():
-                        display_name = "Unknown"
-                        if guild:
-                            member = guild.get_member(int(user_id))
-                            if member:
-                                display_name = member.display_name
-                        if display_name == "Unknown":
-                            try:
-                                user = await bot.fetch_user(int(user_id))
-                                display_name = getattr(user, "display_name", None) or getattr(user, "name", f"User {user_id}")
-                            except Exception:
-                                display_name = f"User {user_id}"
-
-                        color = tier_colors.get(str(tier), "⚪")
-                        member_lines.append(f"{display_name} — {color} Tier {tier}")
-                    filled_text += f"{profession_icons.get(prof,'')} **{prof}**: " + ", ".join(member_lines) + "\n"
-                else:
-                    empty_text += f"{profession_icons.get(prof,'')} {prof} — *Empty*\n"
-
-            if filled_text:
-                filled_embed.add_field(name=f"**{category_name}**", value=filled_text, inline=False)
-            if empty_text:
-                empty_embed.add_field(name=f"**{category_name}**", value=empty_text, inline=False)
-
-        embeds = []
-        if filled_embed.fields:
-            embeds.append(filled_embed)
-        if empty_embed.fields:
-            embeds.append(empty_embed)
-
-        if not embeds:
-            embeds.append(discord.Embed(
-                title="📭 No Professions Found",
-                description="Nobody has registered any professions yet.",
-                color=discord.Color.greyple()
-            ))
-
-        return embeds
+        for profession, members in self.artisan_registry.items():
+            if not members:
+                continue
+            lines = []
+            for user_id, tier in members.items():
+                member = guild.get_member(int(user_id)) if guild else None
+                name = member.display_name if member else f"User {user_id}"
+                color = TIER_COLORS.get(str(tier), "⚪")
+                lines.append(f"{color} {name} — Tier {tier}")
+            embed.add_field(
+                name=f"{profession} ({len(members)} members)",
+                value="\n".join(lines),
+                inline=False
+            )
+        return [embed]
 
 
-# ------------------------------------------------------
-# Setup Cog
-# ------------------------------------------------------
+# ======================================================
+# Cog Setup
+# ======================================================
 async def setup(bot):
     await bot.add_cog(Professions(bot))
