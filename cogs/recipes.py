@@ -163,6 +163,33 @@ class Recipes(commands.Cog):
                 await interaction.response.send_message(f"🗑 Unlearned **{self.name}**.", ephemeral=True)
                 await refresh_hub(interaction, "recipes")
 
+    class ViewLearnedView(View):
+        def __init__(self, cog, user_id):
+            super().__init__(timeout=240)
+            # show learned recipes per profession
+            learned = cog.get_user_recipes(user_id)
+            for prof, items in learned.items():
+                self.add_item(discord.ui.Button(
+                    label=f"{prof} ({len(items)})",
+                    style=discord.ButtonStyle.secondary,
+                    custom_id=f"rc_unlearn_{user_id}_{prof}"
+                ))
+
+    class SearchRecipeModal(Modal, title="🔍 Search Recipes"):
+        def __init__(self, cog, user_id):
+            super().__init__(timeout=240)
+            self.cog, self.user_id = cog, user_id
+            self.query = TextInput(label="Search term", required=True)
+            self.add_item(self.query)
+
+        async def on_submit(self, interaction):
+            results = self.cog.search_recipes(self.query.value)
+            if not results:
+                return await interaction.response.send_message("⚠️ No matches found.", ephemeral=True)
+            lines = [f"• {r['name']} ({r['profession']})" for r in results[:10]]
+            e = discord.Embed(title="🔍 Search Results", description="\n".join(lines), color=discord.Color.green())
+            await interaction.response.send_message(embed=e, ephemeral=True)
+
     # ---------------- Hub ----------------
     def build_recipe_buttons(self, user_id: int):
         v = View(timeout=240)

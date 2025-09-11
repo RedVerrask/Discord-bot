@@ -55,15 +55,16 @@ class AshesBot(commands.Bot):
 async def load_cogs(bot: commands.Bot):
     """Load all cogs safely, skipping missing ones."""
     cogs = [
-        "cogs.profile",
-        "cogs.professions",
-        "cogs.recipes",
-        "cogs.market",     # if you have it; ok to fail
-        "cogs.mailbox",    # ✅ correct name (not cogs.mail)
-        "cogs.trades",     # ✅ make sure trades loads
-        # "cogs.registry", # only if/when you add this file
-        "cogs.hub",
-    ]
+    "cogs.profile",
+    "cogs.professions",
+    "cogs.recipes",
+    "cogs.market",
+    "cogs.mailbox",
+    "cogs.trades",
+    "cogs.hub",
+    "utils.debug",   # <-- add this
+]
+
 
     for ext in cogs:
         try:
@@ -88,16 +89,7 @@ bot = AshesBot()
 # =========================
 # Minimal Global Commands
 # =========================
-@bot.tree.command(name="debugtoggle", description="Toggle debug mode (developer only).")
-async def debug_toggle_cmd(interaction: discord.Interaction):
-    if DEV_USER_ID and interaction.user.id != DEV_USER_ID:
-        return await interaction.response.send_message("⛔ You are not authorized to use this.", ephemeral=True)
 
-    bot.debug_mode = not bot.debug_mode
-    status = "ON ✅" if bot.debug_mode else "OFF ❌"
-
-    debug_log("Toggled debug mode", bot=bot, user=interaction.user.id, status=status)
-    await interaction.response.send_message(f"🐞 Debug mode is now **{status}**", ephemeral=True)
 
 
 # =========================
@@ -107,6 +99,9 @@ async def debug_toggle_cmd(interaction: discord.Interaction):
 async def on_ready():
     guild = discord.Object(id=1064785222576644137)  # put your server ID here
     await bot.tree.sync(guild=guild)
+    # In on_ready()
+    await bot.tree.sync()   # sync globally
+
     print("🌐 Slash commands synced instantly!")
 
 
