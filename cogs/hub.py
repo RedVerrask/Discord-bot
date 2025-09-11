@@ -3,6 +3,7 @@ import json
 import discord
 from discord.ext import commands
 from typing import Dict, List, Any, Optional, Tuple
+from discord import app_commands
 
 DATA_DIR = "data"
 RECIPES_FILE = os.path.join(DATA_DIR, "recipes.json")
@@ -471,33 +472,24 @@ class SearchMarketModal(discord.ui.Modal, title="🔎 Search Market"):
 
 # ---------------- Hub Cog ----------------
 class Hub(commands.Cog):
-    """Single-message hub with full UI flows (ephemeral, edit-in-place where possible)."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-        # Register /home slash command directly
-        @bot.tree.command(name="home", description="Open your private Guild Codex hub")
-        async def home(interaction: discord.Interaction):
-            embed, view = await self.render(interaction.user.id, "home")
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+    # Slash command version
+    @app_commands.command(name="home", description="Open your private Guild Codex hub")
+    async def home(self, interaction: discord.Interaction):
+        embed, view = await self.render(interaction.user.id, "home")
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-    # Quick properties (profile/prof/recipes/market)
-    @property
-    def profile(self): return self.bot.get_cog("Profile")
-    @property
-    def prof(self): return self.bot.get_cog("Professions")
-    @property
-    def recipes(self): return self.bot.get_cog("Recipes")
-    @property
-    def market(self): return self.bot.get_cog("Market")
-
-    # Keep all your render_* methods here (render_home, render_profile, etc.)
-    # ... (they’re already in your file above)
+    # Optional text-command fallback (!home)
+    @commands.command(name="home")
+    async def home_prefix(self, ctx: commands.Context):
+        embed, view = await self.render(ctx.author.id, "home")
+        await ctx.reply(embed=embed, view=view, ephemeral=True)
 
     @commands.hybrid_command(name="hubportal", description="(Admin) Post the hub portal message in this channel")
     @commands.has_permissions(administrator=True)
     async def hubportal(self, ctx: commands.Context):
-        """Admin command: posts a permanent portal message for members to open their hub."""
         view = PortalView(self)
         embed = discord.Embed(
             title="🏰 Guild Codex Portal",
@@ -506,21 +498,6 @@ class Hub(commands.Cog):
         )
         await ctx.send(embed=embed, view=view)
         await ctx.reply(f"✅ Portal posted in {ctx.channel.mention}", ephemeral=True)
-
-
-class PortalView(discord.ui.View):
-    def __init__(self, hub: Hub):
-        super().__init__(timeout=None)
-        self.hub = hub
-
-    @discord.ui.button(label="Open My Hub", style=discord.ButtonStyle.primary, emoji="🏰")
-    async def open_hub(self, itx: discord.Interaction, _: discord.ui.Button):
-        embed, view = await self.hub.render(itx.user.id, "home")
-        await itx.response.send_message(embed=embed, view=view, ephemeral=True)
-
-
-async def setup(bot: commands.Bot):
-    await bot.add_cog(Hub(bot))
 
 
 # ---------- Pagination Views ----------
