@@ -410,42 +410,28 @@ class Hub(commands.Cog):
                 user = self.bot.get_user(user_id) or discord.Object(id=user_id)  # type: ignore
                 built = prof_cog.build_profile_embed(user)  # type: ignore
                 if isinstance(built, discord.Embed):
+                    # --- Augment with professions if Professions cog exists ---
+                    pro_cog = self.bot.get_cog("Professions")
+                    if pro_cog and hasattr(pro_cog, "get_user_professions"):
+                        profs = pro_cog.get_user_professions(user_id)  # { name: tier }
+                        if profs:
+                            lines = [f"• **{p}** — {tier}" for p, tier in profs.items()]
+                            built.add_field(name="🛠️ Professions", value="\n".join(lines), inline=False)
                     return built
             except Exception as ex:
                 e = discord.Embed(title="👤 Profile", color=discord.Color.red())
                 e.add_field(name="Notice", value=f"Profile temporarily unavailable.\n{type(ex).__name__}: {ex}", inline=False)
                 return e
-        # Fallback
-        profiles = _load_json(PROFILES_FILE, {})
-        wishlist = profiles.get(str(user_id), {}).get("wishlist", [])
-        e = discord.Embed(title="👤 Profile", description="Set classes, manage wishlist, and see learned recipes.", color=discord.Color.blue())
-        e.add_field(name="📌 Wishlist", value="\n".join(wishlist) if wishlist else "*Empty*", inline=False)
-        return e
 
-    async def render_professions(self, user_id: int) -> discord.Embed:
-        pro_cog = self.bot.get_cog("Professions")
-        if pro_cog and hasattr(pro_cog, "build_professions_embed"):
-            try:
-                user = self.bot.get_user(user_id) or discord.Object(id=user_id)  # type: ignore
-                built = pro_cog.build_professions_embed(user)  # type: ignore
-                if isinstance(built, discord.Embed):
-                    return built
-            except Exception as ex:
-                e = discord.Embed(title="🛠️ Professions", color=discord.Color.red())
-                e.add_field(
-                    name="Notice",
-                    value=f"Professions temporarily unavailable.\n{type(ex).__name__}: {ex}",
-                    inline=False
-                )
-                return e
-
-        # Fallback if Professions cog not loaded
+        # Fallback if Profile cog not loaded
         e = discord.Embed(
-            title="🛠️ Professions",
-            description="No professions selected yet.",
-            color=discord.Color.orange(),
+            title="👤 Profile",
+            description="Set your character name, classes, wishlist, and professions.",
+            color=discord.Color.blue(),
         )
         return e
+
+
 
 
     async def render_recipes(self, user_id: int) -> discord.Embed:
