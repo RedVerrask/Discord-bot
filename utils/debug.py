@@ -1,11 +1,23 @@
-# cogs/debug.py
+# utils/debug.py
 import discord
 from discord.ext import commands
 from utils.data import load_json
 from cogs.hub import (
-    PROFILES_FILE, PROFESSIONS_FILE, RECIPES_FILE,
-    LEARNED_FILE, MARKET_FILE, TRADES_FILE, MAILBOX_FILE, REGISTRY_FILE
+    PROFILES_FILE, RECIPES_FILE, LEARNED_FILE,
+    MARKET_FILE, TRADES_FILE, MAILBOX_FILE, REGISTRY_FILE
 )
+
+# ✅ Global helper for bot.py and other modules
+def debug_log(message: str, logger=None, bot=None, **extra):
+    """
+    Lightweight debug logger used globally.
+    Falls back to print if no logger is provided.
+    """
+    if logger:
+        logger.info(f"[DEBUG] {message} | {extra}")
+    else:
+        print(f"[DEBUG] {message} | {extra}")
+
 
 class Debug(commands.Cog):
     """Diagnostic tools for dev/testing only."""
@@ -34,7 +46,6 @@ class Debug(commands.Cog):
 
         # ---- Professions ----
         profs_cog = self.bot.get_cog("Professions")
-        profs = load_json(PROFESSIONS_FILE, {})
         if profs_cog:
             mine = profs_cog.get_user_professions(user_id)
             e.add_field(name="🛠 Professions", value=f"✅ {len(mine)} selected", inline=False)
@@ -58,7 +69,11 @@ class Debug(commands.Cog):
             mine = market_cog.get_user_listings(user_id) if hasattr(market_cog, "get_user_listings") else []
             e.add_field(name="💰 Market", value=f"✅ {len(mine)} listings", inline=False)
         else:
-            e.add_field(name="💰 Market", value=f"⚠️ Cog not loaded | {len(market) if isinstance(market, list) else len(market.keys())} raw entries", inline=False)
+            e.add_field(
+                name="💰 Market",
+                value=f"⚠️ Cog not loaded | {len(market) if isinstance(market, list) else len(market.keys())} raw entries",
+                inline=False
+            )
 
         # ---- Trades ----
         trades_cog = self.bot.get_cog("Trades")
@@ -83,6 +98,7 @@ class Debug(commands.Cog):
         e.add_field(name="📜 Registry", value=f"{len(reg)} recipes tracked", inline=False)
 
         await ctx.reply(embed=e, ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Debug(bot))
