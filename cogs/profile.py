@@ -121,7 +121,8 @@ class Profile(commands.Cog):
                 matches = market_cog.find_matches_for_wishlist(wishlist)
                 if matches:
                     first = matches[:6]
-                    v = "\n".join([f"• {x['item']} — {x['price_str']}  ({x['village']})" for x in first])
+                    v = "\n".join([f"• {x['item']} — {x.get('price_str', 'N/A')} ({x.get('village', 'Unknown')})"for x in first])
+
                     embed.add_field(name="🧭 Wishlist Matches on Market", value=v, inline=False)
 
         embed.set_footer(text="Manage via the buttons below.")

@@ -1,293 +1,416 @@
+import os
+import json
 import discord
 from discord.ext import commands
-import json
-import os
 
-RECIPES_FILE = "data/recipes.json"
-LEARNED_FILE = "data/learned_recipes.json"
+RECIPES_FILE = "data/recipes.json"          # your big flat list lives here
+LEARNED_FILE = "data/learned_recipes.json"  # { user_id: { profession: [ {name, link} ] } }
 
-# =========================
-# JSON Helpers
-# =========================
-def load_json(file):
-    if not os.path.exists(file):
-        return {}
-    with open(file, "r", encoding="utf-8") as f:
-        return json.load(f)
+# ----------------------------
+# Small JSON helpers
+# ----------------------------
+def _load_json(path, default):
+    if not os.path.exists(path):
+        return default
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
 
-def save_json(file, data):
-    with open(file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+def _save_json(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
 
-# =========================
-# Recipes Cog
-# =========================
+
 class Recipes(commands.Cog):
+    """
+    Recipes Cog that accepts a FLAT data/recipes.json:
+      [
+        {"name": "...", "profession": "Armorsmithing", "level": "0", "url": "https://..."},
+        ...
+      ]
+
+    We normalize it at load time into:
+      self.recipes_by_prof = {
+        "Armorsmithing": [ {"name": "...", "url": "...", "level": "0"}, ... ],
+        ...
+      }
+
+    Learned recipes persist in LEARNED_FILE as:
+      { user_id: { profession: [ {"name": "...", "link": "..."} ] } }
+    """
     def __init__(self, bot):
         self.bot = bot
-        self.recipes = load_json(RECIPES_FILE)
-        self.learned = load_json(LEARNED_FILE)
 
-    # Get a user's learned recipes
-    def get_user_recipes(self, user_id):
+        # normalized recipes
+        self.recipes_by_prof: dict[str, list[dict]] = {}
+        # quick name -> (profession, recipe_dict) index for lookups
+        self._name_index: list[tuple[str, str, dict]] = []  # (name_lower, profession, rec)
+
+        # learned storage
+        self.learned: dict = _load_json(LEARNED_FILE, {})
+
+        self._load_and_normalize()
+
+    # ----------------------------
+    # Load & normalize flat JSON
+    # ----------------------------
+    def _load_and_normalize(self):
+        raw = _load_json(RECIPES_FILE, [])
+        by_prof: dict[str, list[dict]] = {}
+
+        # Accept both dict objects and defensive fallbacks
+        for entry in raw if isinstance(raw, list) else []:
+            if not isinstance(entry, dict):
+                # ignore invalid
+                continue
+            name = str(entry.get("name", "")).strip()
+            prof = str(entry.get("profession", "Unknown")).strip() or "Unknown"
+            level = str(entry.get("level", "")).strip()
+            url = entry.get("url") or entry.get("link") or None
+            if not name:
+                continue
+
+            by_prof.setdefault(prof, []).append({
+                "name": name,
+                "level": level,
+                "url": url,
+            })
+
+        # sort for nicer UX
+        for prof, arr in by_prof.items():
+            arr.sort(key=lambda r: r["name"].lower())
+
+        self.recipes_by_prof = dict(sorted(by_prof.items(), key=lambda kv: kv[0].lower()))
+        # build index
+        self._name_index = []
+        for prof, arr in self.recipes_by_prof.items():
+            for rec in arr:
+                self._name_index.append((rec["name"].lower(), prof, rec))
+
+    # ----------------------------
+    # Learned helpers
+    # ----------------------------
+    def _ensure_user_prof_bucket(self, user_id: int, profession: str):
+        uid = str(user_id)
+        if uid not in self.learned:
+            self.learned[uid] = {}
+        if profession not in self.learned[uid]:
+            self.learned[uid][profession] = []
+
+    def get_user_recipes(self, user_id: int) -> dict:
         return self.learned.get(str(user_id), {})
 
-    # Add a recipe to user's learned list
-    def add_learned_recipe(self, user_id, profession, recipe_name, link):
-        user_id = str(user_id)
-        if user_id not in self.learned:
-            self.learned[user_id] = {}
-        if profession not in self.learned[user_id]:
-            self.learned[user_id][profession] = []
-
-        # Avoid duplicates
-        if any(r["name"] == recipe_name for r in self.learned[user_id][profession]):
+    def add_learned_recipe(self, user_id: int, profession: str, recipe_name: str, link: str | None):
+        self._ensure_user_prof_bucket(user_id, profession)
+        bucket = self.learned[str(user_id)][profession]
+        if any(r.get("name") == recipe_name for r in bucket):
             return False
-
-        self.learned[user_id][profession].append({"name": recipe_name, "link": link})
-        save_json(LEARNED_FILE, self.learned)
+        bucket.append({"name": recipe_name, "link": link})
+        _save_json(LEARNED_FILE, self.learned)
         return True
 
-    # Remove a learned recipe
-    def remove_learned_recipe(self, user_id, profession, recipe_name):
-        user_id = str(user_id)
-        if user_id in self.learned and profession in self.learned[user_id]:
-            self.learned[user_id][profession] = [
-                r for r in self.learned[user_id][profession] if r["name"] != recipe_name
-            ]
-            save_json(LEARNED_FILE, self.learned)
+    def remove_learned_recipe(self, user_id: int, profession: str, recipe_name: str):
+        uid = str(user_id)
+        if uid in self.learned and profession in self.learned[uid]:
+            before = len(self.learned[uid][profession])
+            self.learned[uid][profession] = [r for r in self.learned[uid][profession] if r.get("name") != recipe_name]
+            if len(self.learned[uid][profession]) != before:
+                _save_json(LEARNED_FILE, self.learned)
+                return True
+        return False
 
-    # Search recipes by partial name (optionally limit to professions)
-    def search_recipes(self, query, professions=None):
+    # ----------------------------
+    # Lookup helpers
+    # ----------------------------
+    def get_recipe_link(self, recipe_name: str) -> str | None:
+        name_l = recipe_name.lower()
+        for n, _, rec in self._name_index:
+            if n == name_l:
+                return rec.get("url")
+        # fallback: first partial match
+        for n, _, rec in self._name_index:
+            if name_l in n:
+                return rec.get("url")
+        return None
+
+    def search_recipes(self, query: str, professions: list[str] | None = None, limit: int = 25) -> list[dict]:
+        """
+        Returns: [{name, profession, link, level}]
+        - Case-insensitive substring search
+        - Optional profession filter
+        """
+        if not query:
+            return []
+        q = query.lower().strip()
         results = []
-        query = query.lower()
-        for profession, recipes in self.recipes.items():
-            if professions and profession not in professions:
-                continue
-            for recipe in recipes:
-                if query in recipe["name"].lower():
+
+        if professions:
+            # filter limited professions first
+            prof_set = {p.lower() for p in professions}
+            for prof, arr in self.recipes_by_prof.items():
+                if prof.lower() not in prof_set:
+                    continue
+                for rec in arr:
+                    if q in rec["name"].lower():
+                        results.append({
+                            "name": rec["name"],
+                            "profession": prof,
+                            "link": rec.get("url"),
+                            "level": rec.get("level", ""),
+                        })
+                        if len(results) >= limit:
+                            return results
+        else:
+            # search global index
+            for n, prof, rec in self._name_index:
+                if q in n:
                     results.append({
-                        "name": recipe["name"],
-                        "link": recipe.get("link"),
-                        "profession": profession
+                        "name": rec["name"],
+                        "profession": prof,
+                        "link": rec.get("url"),
+                        "level": rec.get("level", ""),
                     })
+                    if len(results) >= limit:
+                        return results
+
         return results
 
+
 # ==========================================================
-# Recipes Menu View
+# Top-level Recipes Menu (buttons)
 # ==========================================================
 class RecipesMainView(discord.ui.View):
-    def __init__(self, recipes_cog, user):
+    def __init__(self, recipes_cog: Recipes, user: discord.Member | discord.User):
         super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
         self.user = user
 
-    # 📗 Learn Recipes
     @discord.ui.button(label="📗 Learn Recipes", style=discord.ButtonStyle.success)
-    async def learn_recipes(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = LearnRecipeModal(self.recipes_cog, self.user)
-        await interaction.response.send_modal(modal)
+    async def learn_recipes(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await interaction.response.send_modal(LearnRecipeModal(self.recipes_cog, interaction.user))
 
-    # 📘 Learned Recipes
     @discord.ui.button(label="📘 Learned Recipes", style=discord.ButtonStyle.primary)
-    async def learned_recipes(self, interaction: discord.Interaction, button: discord.ui.Button):
-        view = LearnedRecipesView(self.recipes_cog, self.user)
+    async def learned_recipes(self, interaction: discord.Interaction, _: discord.ui.Button):
+        view = LearnedRecipesView(self.recipes_cog, interaction.user)
         await view.send_embed(interaction)
 
-    # 🔍 Search Recipes
     @discord.ui.button(label="🔍 Search Recipes", style=discord.ButtonStyle.secondary)
-    async def search_recipes(self, interaction: discord.Interaction, button: discord.ui.Button):
-        modal = SearchRecipeModal(self.recipes_cog)
-        await interaction.response.send_modal(modal)
+    async def search_recipes(self, interaction: discord.Interaction, _: discord.ui.Button):
+        await interaction.response.send_modal(SearchRecipeModal(self.recipes_cog))
+
 
 # ==========================================================
-# Learn Recipe Modal
+# Learn Recipe: modal -> dropdown (limited to user's professions)
 # ==========================================================
-class LearnRecipeModal(discord.ui.Modal, title="📗 Learn Recipe"):
-    def __init__(self, recipes_cog, user):
-        super().__init__()
+class LearnRecipeModal(discord.ui.Modal, title="📗 Learn a Recipe"):
+    def __init__(self, recipes_cog: Recipes, user: discord.Member | discord.User):
+        super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
         self.user = user
 
         self.query = discord.ui.TextInput(
-            label="Enter Recipe Name",
-            placeholder="Example: Obsidian Dagger",
+            label="Recipe Name",
+            placeholder="Partial or full (e.g., 'Dagger')",
             required=True
         )
         self.add_item(self.query)
 
     async def on_submit(self, interaction: discord.Interaction):
-        professions_cog = interaction.client.get_cog("Professions")
-        professions = [p["name"] for p in professions_cog.get_user_professions(self.user.id)]
-
-        matches = self.recipes_cog.search_recipes(self.query.value, professions)
-        if not matches:
-            await interaction.response.send_message("⚠️ No recipes found.", ephemeral=True)
-            return
-
-        view = discord.ui.View(timeout=None)
-        embed = discord.Embed(
-            title="📗 Select Recipe to Learn",
-            description=f"Results for **{self.query.value}**:",
-            color=discord.Color.green()
-        )
-
-        for recipe in matches:
-            button = discord.ui.Button(
-                label=f"Learn: {recipe['name']}",
-                style=discord.ButtonStyle.success
+        # fetch professions from Professions cog
+        prof_cog = interaction.client.get_cog("Professions")
+        user_profs = []
+        if prof_cog:
+            # Expecting list of dicts with "name"
+            try:
+                user_profs = [p["name"] for p in prof_cog.get_user_professions(self.user.id)]
+            except Exception:
+                user_profs = []
+        if not user_profs:
+            return await interaction.response.send_message(
+                "⚠️ You need to set your professions first.",
+                ephemeral=True
             )
 
-            async def callback(i, r=recipe):
-                success = self.recipes_cog.add_learned_recipe(
-                    self.user.id, r["profession"], r["name"], r["link"]
-                )
-                if success:
-                    await i.response.send_message(f"✅ Learned **{r['name']}**!", ephemeral=True)
-                else:
-                    await i.response.send_message(f"⚠️ Already learned **{r['name']}**.", ephemeral=True)
-            button.callback = callback
-            view.add_item(button)
+        matches = self.recipes_cog.search_recipes(self.query.value, professions=user_profs, limit=25)
+        if not matches:
+            return await interaction.response.send_message(
+                "⚠️ No matching recipes found within your professions.",
+                ephemeral=True
+            )
 
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        # Build dropdown (Discord max 25 options)
+        options = [
+            discord.SelectOption(
+                label=m["name"][:100],
+                value=m["name"][:100],
+                description=(m["profession"][:97] + "...") if len(m["profession"]) > 97 else m["profession"]
+            )
+            for m in matches[:25]
+        ]
+
+        select = discord.ui.Select(placeholder="Select a recipe to learn…", options=options)
+        view = discord.ui.View(timeout=120)
+
+        async def on_pick(i: discord.Interaction):
+            picked_name = select.values[0]
+            # Find chosen entry for profession & link
+            chosen = next((m for m in matches if m["name"] == picked_name), None)
+            if not chosen:
+                return await i.response.send_message("⚠️ Selection not found anymore.", ephemeral=True)
+
+            ok = self.recipes_cog.add_learned_recipe(
+                self.user.id, chosen["profession"], chosen["name"], chosen.get("link")
+            )
+            if ok:
+                await i.response.send_message(f"✅ Learned **{chosen['name']}**!", ephemeral=True)
+            else:
+                await i.response.send_message(f"⚠️ You already learned **{chosen['name']}**.", ephemeral=True)
+
+        select.callback = on_pick
+        view.add_item(select)
+
+        await interaction.response.send_message(
+            content=f"Found **{len(matches)}** result(s). Pick one:",
+            view=view,
+            ephemeral=True
+        )
+
 
 # ==========================================================
-# Learned Recipes View
+# Learned Recipes: yours + button to view others
 # ==========================================================
 class LearnedRecipesView(discord.ui.View):
-    def __init__(self, recipes_cog, user):
+    def __init__(self, recipes_cog: Recipes, user: discord.Member | discord.User):
         super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
         self.user = user
 
     async def send_embed(self, interaction: discord.Interaction):
-        user_recipes = self.recipes_cog.get_user_recipes(self.user.id)
+        data = self.recipes_cog.get_user_recipes(self.user.id)
+
         embed = discord.Embed(
-            title=f"📘 {self.user.display_name}'s Learned Recipes",
+            title=f"📘 {getattr(self.user, 'display_name', self.user.name)}'s Learned Recipes",
             color=discord.Color.blue()
         )
 
-        if not user_recipes:
+        if not data:
             embed.description = "*You haven’t learned any recipes yet.*"
         else:
-            for profession, recipes in user_recipes.items():
-                recipe_list = "\n".join(
-                    [f"• [{r['name']}]({r['link']})" for r in recipes]
-                )
-                embed.add_field(name=profession, value=recipe_list, inline=False)
+            # compact per profession
+            for prof, arr in data.items():
+                if not arr:
+                    continue
+                lines = [f"• [{r['name']}]({r.get('link')})" if r.get("link") else f"• {r['name']}" for r in arr]
+                # cap the field length to avoid hitting embed limits
+                chunk = "\n".join(lines[:20])
+                embed.add_field(name=prof, value=chunk or "*None*", inline=False)
 
-        # Add button to view others’ recipes
         view = discord.ui.View(timeout=None)
         view.add_item(ViewOthersRecipesButton(self.recipes_cog))
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
-# ==========================================================
-# View Others’ Recipes Button
-# ==========================================================
+
 class ViewOthersRecipesButton(discord.ui.Button):
-    def __init__(self, recipes_cog):
-        super().__init__(
-            label="👥 View Others' Recipes",
-            style=discord.ButtonStyle.secondary
-        )
+    def __init__(self, recipes_cog: Recipes):
+        super().__init__(label="👥 View Others' Recipes", style=discord.ButtonStyle.secondary)
         self.recipes_cog = recipes_cog
 
     async def callback(self, interaction: discord.Interaction):
         guild = interaction.guild
-        members_with_recipes = {
-            uid: r for uid, r in self.recipes_cog.learned.items() if r
-        }
+        if guild is None:
+            return await interaction.response.send_message("⚠️ Guild not found.", ephemeral=True)
 
-        if not members_with_recipes:
-            await interaction.response.send_message(
-                "⚠️ No guild members have learned any recipes yet.",
+        # only show members that actually have learned recipes
+        active_ids = []
+        for uid, prof_map in (self.recipes_cog.learned or {}).items():
+            if any(prof_map.get(p) for p in prof_map.keys()):
+                try:
+                    active_ids.append(int(uid))
+                except ValueError:
+                    continue
+
+        options: list[discord.SelectOption] = []
+        for uid in sorted(active_ids):
+            m = guild.get_member(uid)
+            if m and not m.bot:
+                label = m.display_name
+                options.append(discord.SelectOption(label=label[:100], value=str(uid)))
+
+        if not options:
+            return await interaction.response.send_message(
+                "⚠️ No guild members have learned recipes yet.",
                 ephemeral=True
             )
-            return
 
-        options = []
-        for uid in members_with_recipes.keys():
-            member = guild.get_member(int(uid))
-            if member:
-                options.append(discord.SelectOption(
-                    label=member.display_name,
-                    value=str(uid),
-                    description="View this player's recipes"
-                ))
+        select = discord.ui.Select(placeholder="Select a member…", options=options[:25])
+        view = discord.ui.View(timeout=120)
 
-        dropdown = discord.ui.Select(
-            placeholder="Select a guild member...",
-            options=options,
-            custom_id="recipes_view_others_dropdown"
-        )
+        async def on_pick(i: discord.Interaction):
+            target_id = int(select.values[0])
+            target = guild.get_member(target_id)
+            data = self.recipes_cog.get_user_recipes(target_id)
 
-        view = discord.ui.View(timeout=None)
-
-        async def dropdown_callback(select_interaction: discord.Interaction):
-            target_id = dropdown.values[0]
-            target_user = guild.get_member(int(target_id))
-
-            recipes = self.recipes_cog.get_user_recipes(target_id)
             embed = discord.Embed(
-                title=f"📘 {target_user.display_name}'s Learned Recipes",
+                title=f"📘 {getattr(target, 'display_name', target_id)}'s Learned Recipes",
                 color=discord.Color.teal()
             )
-
-            if not recipes:
+            if not data:
                 embed.description = "*This player hasn’t learned any recipes yet.*"
             else:
-                for profession, learned in recipes.items():
-                    recipe_list = "\n".join(
-                        [f"• [{r['name']}]({r['link']})" for r in learned]
-                    )
-                    embed.add_field(name=profession, value=recipe_list, inline=False)
+                for prof, arr in data.items():
+                    if not arr:
+                        continue
+                    lines = [f"• [{r['name']}]({r.get('link')})" if r.get("link") else f"• {r['name']}" for r in arr]
+                    embed.add_field(name=prof, value="\n".join(lines[:20]) or "*None*", inline=False)
 
-            await select_interaction.response.send_message(embed=embed, ephemeral=True)
+            await i.response.send_message(embed=embed, ephemeral=True)
 
-        dropdown.callback = dropdown_callback
-        view.add_item(dropdown)
+        select.callback = on_pick
+        view.add_item(select)
+        await interaction.response.send_message("Choose a member:", view=view, ephemeral=True)
 
-        await interaction.response.send_message(
-            "Choose a guild member to view their learned recipes:",
-            view=view,
-            ephemeral=True
-        )
 
 # ==========================================================
-# Search Recipe Modal
+# Generic Search Modal (all professions)
 # ==========================================================
 class SearchRecipeModal(discord.ui.Modal, title="🔍 Search Recipes"):
-    def __init__(self, recipes_cog):
-        super().__init__()
+    def __init__(self, recipes_cog: Recipes):
+        super().__init__(timeout=None)
         self.recipes_cog = recipes_cog
         self.query = discord.ui.TextInput(
-            label="Search for Recipe",
-            placeholder="Example: Phoenix Cloak",
+            label="Search",
+            placeholder="e.g., 'Phoenix Cloak'",
             required=True
         )
         self.add_item(self.query)
 
     async def on_submit(self, interaction: discord.Interaction):
-        matches = self.recipes_cog.search_recipes(self.query.value)
+        matches = self.recipes_cog.search_recipes(self.query.value, professions=None, limit=25)
+
         embed = discord.Embed(
-            title=f"🔍 Search Results for '{self.query.value}'",
+            title=f"🔍 Results for “{self.query.value}”",
             color=discord.Color.purple()
         )
 
         if not matches:
-            embed.description = "⚠️ No recipes found."
+            embed.description = "No recipes found."
         else:
-            for recipe in matches[:10]:
-                embed.add_field(
-                    name=recipe["name"],
-                    value=f"**Profession:** {recipe['profession']}\n[View on Ashes Codex]({recipe['link']})",
-                    inline=False
-                )
+            for m in matches:
+                line = f"**{m['name']}** — *{m['profession']}*"
+                if m.get("link"):
+                    line += f"\n[Open on Ashes Codex]({m['link']})"
+                if m.get("level"):
+                    line += f"\nLevel: {m['level']}"
+                embed.add_field(name="\u200b", value=line, inline=False)
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+
 # ==========================================================
-# Cog Setup
+# Extension setup
 # ==========================================================
 async def setup(bot):
     await bot.add_cog(Recipes(bot))
