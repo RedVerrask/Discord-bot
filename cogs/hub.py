@@ -630,31 +630,32 @@ class ListingsPagerView(discord.ui.View):
 
 # ---------------- Commands: only to open hub (one-time), everything else is UI ----------------
 class Hub(commands.Cog):
-    async def setup_hook(self):
-        pass
+    ...  # keep all the existing stuff
 
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
+    @commands.hybrid_command(name="hubportal", description="(Admin) Post the hub portal message in this channel")
+    @commands.has_permissions(administrator=True)
+    async def hubportal(self, ctx: commands.Context):
+        """Admin command: posts a permanent portal message for members to open their hub."""
+        view = PortalView(self)
+        embed = discord.Embed(
+            title="🏰 Guild Codex Portal",
+            description="Click below to open your personal **Guild Codex** hub.\n\nAll interactions are **private** — only you can see your hub.",
+            color=discord.Color.gold()
+        )
+        msg = await ctx.send(embed=embed, view=view)
+        await ctx.reply(f"✅ Portal posted in {ctx.channel.mention}", ephemeral=True)
 
-    @commands.hybrid_command(name="home", description="Open your private hub (ephemeral)")
-    async def home(self, ctx: commands.Context):
-        embed, view = await self.render(ctx.author.id, "home")
-        if hasattr(ctx, "interaction") and ctx.interaction is not None:
-            await ctx.interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-        else:
-            # Fallback to a normal message if needed (not typical)
-            await ctx.reply(embed=embed, view=view, delete_after=60)
 
-    # internal render
-    async def render(self, user_id: int, section: str) -> tuple[discord.Embed, discord.ui.View]:
-        if section == "home":         return self.render_home(user_id)
-        if section == "profile":      return self.render_profile(user_id)
-        if section == "professions":  return self.render_professions(user_id)
-        if section == "recipes":      return self.render_recipes(user_id)
-        if section == "market":       return self.render_market(user_id)
-        return self.render_home(user_id)
+class PortalView(discord.ui.View):
+    def __init__(self, hub: Hub):
+        super().__init__(timeout=None)
+        self.hub = hub
 
-    # The five render_* methods + helpers sit above (kept for clarity)
+    @discord.ui.button(label="Open My Hub", style=discord.ButtonStyle.primary, emoji="🏰")
+    async def open_hub(self, itx: discord.Interaction, _: discord.ui.Button):
+        embed, view = await self.hub.render(itx.user.id, "home")
+        await itx.response.send_message(embed=embed, view=view, ephemeral=True)
+
 
 
 async def setup(bot: commands.Bot):
