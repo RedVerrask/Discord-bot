@@ -37,8 +37,14 @@ class AshesBot(commands.Bot):
     async def setup_hook(self):
         os.makedirs("data", exist_ok=True)
         await load_cogs(self)
-        synced = await self.tree.sync()
-        logger.info(f"🌐 Synced {len(synced)} slash commands.")
+
+        # Force sync only to your dev guild (instant, no 1hr wait)
+        GUILD_ID = 1064785222576644137  # replace with your Discord server ID
+        guild = discord.Object(id=GUILD_ID)
+        synced = await self.tree.sync(guild=guild)
+
+        logger.info(f"🌐 Synced {len(synced)} guild slash commands.")
+
 
 
 async def load_cogs(bot: commands.Bot):
