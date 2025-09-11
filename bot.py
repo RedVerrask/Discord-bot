@@ -44,8 +44,7 @@ class AshesBot(commands.Bot):
         # Register persistent views
         try:
             from cogs.hub import HubView
-            self.add_view(HubView(cog=None, user_id=0))  # Register base view for all users
-            debug_log("🔄 Registered persistent HubView", logger, self)
+            
         except Exception as e:
             logger.warning(f"⚠️ Could not register HubView: {e}")
 
@@ -89,7 +88,7 @@ bot = AshesBot()
 # =========================
 # Minimal Global Commands
 # =========================
-@bot.tree.command(name="debug_toggle", description="Toggle debug mode (developer only).")
+@bot.tree.command(name="debugtoggle", description="Toggle debug mode (developer only).")
 async def debug_toggle_cmd(interaction: discord.Interaction):
     if DEV_USER_ID and interaction.user.id != DEV_USER_ID:
         return await interaction.response.send_message("⛔ You are not authorized to use this.", ephemeral=True)
