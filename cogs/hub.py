@@ -630,8 +630,14 @@ class ListingsPagerView(discord.ui.View):
 
 # ---------------- Commands: only to open hub (one-time), everything else is UI ----------------
 class Hub(commands.Cog):
-    ...  # keep all the existing stuff
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
 
+        # Register /home slash command directly
+        @bot.tree.command(name="home", description="Open your private Guild Codex hub")
+        async def home(interaction: discord.Interaction):
+            embed, view = await self.render(interaction.user.id, "home")
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
     @commands.hybrid_command(name="hubportal", description="(Admin) Post the hub portal message in this channel")
     @commands.has_permissions(administrator=True)
     async def hubportal(self, ctx: commands.Context):
