@@ -89,8 +89,8 @@ bot = AshesBot()
 # =========================
 # Minimal Global Commands
 # =========================
-@bot.tree.command(name="debug", description="Toggle debug mode (developer only).")
-async def debug_cmd(interaction: discord.Interaction):
+@bot.tree.command(name="debug_toggle", description="Toggle debug mode (developer only).")
+async def debug_toggle_cmd(interaction: discord.Interaction):
     if DEV_USER_ID and interaction.user.id != DEV_USER_ID:
         return await interaction.response.send_message("⛔ You are not authorized to use this.", ephemeral=True)
 
