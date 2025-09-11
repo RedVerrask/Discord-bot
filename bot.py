@@ -73,7 +73,18 @@ async def load_cogs(bot: commands.Bot):
         except Exception as e:
             logger.exception(f"❌ Failed to load {ext}: {e}")
 
+def debug_log(message: str, logger=None, bot=None, **extra):
+    """
+    Lightweight debug logger used globally.
+    Falls back to print if logger is missing.
+    """
+    if logger:
+        logger.info(f"[DEBUG] {message} | {extra}")
+    else:
+        print(f"[DEBUG] {message} | {extra}")
+
 bot = AshesBot()
+
 
 # =========================
 # Minimal Global Commands
