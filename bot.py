@@ -26,7 +26,7 @@ if not TOKEN:
     raise RuntimeError("❌ DISCORD_TOKEN is missing! Set it in Railway → Variables before deploying.")
 
 # Your Discord user ID for dev-only commands
-DEV_USER_ID = 1064785222576644137
+DEV_USER_ID = 359521236663009293
 
 
 class AshesBot(commands.Bot):
