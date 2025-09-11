@@ -121,7 +121,8 @@ class Profile(commands.Cog):
                 matches = market_cog.find_matches_for_wishlist(wishlist)
                 if matches:
                     first = matches[:6]
-                    v = "\n".join([f"• {x['item']} — {x.get('price_str', 'N/A')} ({x.get('village', 'Unknown')})"for x in first])
+                    v = "\n".join([f"• {x.get('item', '?')} — {x.get('price_str', x.get('price', '?'))} ({x.get('village', '?')})"for x in first])
+
 
                     embed.add_field(name="🧭 Wishlist Matches on Market", value=v, inline=False)
 
@@ -230,37 +231,33 @@ class ProfileMenuView(discord.ui.View):
 
     @discord.ui.button(label="🎭 Set Classes", style=discord.ButtonStyle.primary, custom_id="profile_set_classes")
     async def set_classes(self, itx: discord.Interaction, _: discord.ui.Button):
-        if not self._mine(itx.user):
+        if itx.user.id != self.owner.id:
             return await itx.response.send_message("⚠️ This menu isn't yours.", ephemeral=True)
+
         await itx.response.send_modal(SetClassesModal(self.cog, self.owner))
+
+        # After modal submits, refresh embed
+        async def refresh_after_submit(i: discord.Interaction):
+            embed = self.cog.build_profile_embed(self.owner)
+            await i.message.edit(embed=embed, view=ProfileMenuView(self.cog, self.owner))
+
+        self.cog.bot.add_listener(refresh_after_submit, "on_modal_submit")
+
 
     @discord.ui.button(label="➕ Add to Wishlist", style=discord.ButtonStyle.success, custom_id="profile_wish_add")
     async def wish_add(self, itx: discord.Interaction, _: discord.ui.Button):
-        if not self._mine(itx.user):
+        if itx.user.id != self.owner.id:
             return await itx.response.send_message("⚠️ This menu isn't yours.", ephemeral=True)
+
         await itx.response.send_modal(AddWishlistModal(self.cog, self.owner))
 
-    @discord.ui.button(label="🗑️ Remove from Wishlist", style=discord.ButtonStyle.danger, custom_id="profile_wish_del")
-    async def wish_del(self, itx: discord.Interaction, _: discord.ui.Button):
-        if not self._mine(itx.user):
-            return await itx.response.send_message("⚠️ This menu isn't yours.", ephemeral=True)
-        prof = self.cog.get_profile(self.owner.id)
-        if not prof["wishlist"]:
-            return await itx.response.send_message("Your wishlist is empty.", ephemeral=True)
+        async def refresh_after_submit(i: discord.Interaction):
+            embed = self.cog.build_profile_embed(self.owner)
+            await i.message.edit(embed=embed, view=ProfileMenuView(self.cog, self.owner))
 
-        opts = [discord.SelectOption(label=w, value=w) for w in prof["wishlist"][:25]]
-        sel = discord.ui.Select(placeholder="Pick an item to remove…", options=opts, custom_id="profile_wish_del_dd")
-        v = discord.ui.View(timeout=None)
+        self.cog.bot.add_listener(refresh_after_submit, "on_modal_submit")
 
-        async def del_cb(sitx: discord.Interaction):
-            item = sel.values[0]
-            removed = self.cog.remove_wishlist_item(self.owner.id, item)
-            msg = f"✅ Removed **{item}** from wishlist." if removed else "⚠️ Not found."
-            await sitx.response.send_message(msg, ephemeral=True)
 
-        sel.callback = del_cb
-        v.add_item(sel)
-        await itx.response.send_message(view=v, ephemeral=True)
 
     @discord.ui.button(label="📫 Mailbox", style=discord.ButtonStyle.secondary, custom_id="profile_mail")
     async def mailbox(self, itx: discord.Interaction, _: discord.ui.Button):
