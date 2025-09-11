@@ -89,10 +89,6 @@ async def refresh_hub(interaction: discord.Interaction, section: str = "home"):
 # View
 # =========================
 class HubView(discord.ui.View):
-    """
-    Navigation row + dynamic section controls merged in.
-    Button labels can include live counts (badges) by passing computed labels from Hub.get_dashboard_counts().
-    """
     def __init__(self, cog: "Hub", user_id: int, section: str = "home", debug: bool = False):
         super().__init__(timeout=600)
         self.cog = cog
@@ -116,32 +112,6 @@ class HubView(discord.ui.View):
         self.add_item(self._NavBtn("📜 Registry", "registry", discord.ButtonStyle.secondary))
         self.add_item(self._NavBtn(trades_label, "trades", discord.ButtonStyle.secondary))
 
-        
-    class HubView(discord.ui.View):
-        def __init__(self, cog: "Hub", user_id: int, section: str = "home", debug: bool = False):
-            super().__init__(timeout=600)
-            self.cog = cog
-            self.user_id = user_id
-            self.section = section
-            self.debug = debug
-
-            # Compute badges for nav labels
-            counts = self.cog.get_dashboard_counts(user_id)
-            mailbox_label = "📬 Mailbox" + (f" ({counts['mail_unread']})" if counts["mail_unread"] > 0 else "")
-            market_label  = "💰 Market" + (f" ({counts['market_wishlist_matches']})" if counts["market_wishlist_matches"] > 0 else "")
-            trades_label  = "📦 Trades" + (f" ({counts['trade_wishlist_matches']})" if counts["trade_wishlist_matches"] > 0 else "")
-
-            # Top nav
-            self.add_item(self._NavBtn("🏰 Home", "home", discord.ButtonStyle.primary))
-            self.add_item(self._NavBtn("👤 Profile", "profile", discord.ButtonStyle.secondary))
-            self.add_item(self._NavBtn("🛠️ Professions", "professions", discord.ButtonStyle.secondary))
-            self.add_item(self._NavBtn("📜 Recipes", "recipes", discord.ButtonStyle.secondary))
-            self.add_item(self._NavBtn(market_label, "market", discord.ButtonStyle.success))
-            self.add_item(self._NavBtn(mailbox_label, "mailbox", discord.ButtonStyle.secondary))
-            self.add_item(self._NavBtn("📜 Registry", "registry", discord.ButtonStyle.secondary))
-            self.add_item(self._NavBtn(trades_label, "trades", discord.ButtonStyle.secondary))
-
-    # <-- FIX: this method is at class level, not nested inside __init__
     def attach_section_controls(self, section: str, user_id: int):
         """Ask the relevant cog for a per-section control View and merge its items here."""
         if section == "home":
@@ -173,6 +143,27 @@ class HubView(discord.ui.View):
                         self.add_item(item)
             except Exception as ex:
                 print(f"[Hub] Failed to attach controls for {cog_name}.{method_name}: {ex}")
+
+    class _NavBtn(discord.ui.Button):
+        def __init__(self, label: str, target: str, style: discord.ButtonStyle):
+            super().__init__(label=label, style=style)
+            self.target = target
+
+        async def callback(self, interaction: discord.Interaction):
+            v: HubView = self.view  # type: ignore
+            if interaction.user.id != v.user_id:
+                return await interaction.response.send_message(
+                    "This hub belongs to someone else. Use `/home` to open your own.",
+                    ephemeral=True,
+                )
+            embed = await v.cog.render_section(interaction, v.user_id, self.target, v.debug)
+            new_view = HubView(v.cog, v.user_id, section=self.target, debug=v.debug)
+            new_view.attach_section_controls(self.target, v.user_id)
+            await interaction.response.edit_message(embed=embed, view=new_view)
+
+
+        
+    
 
 
 
