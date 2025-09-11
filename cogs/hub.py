@@ -2,7 +2,7 @@ import os
 import json
 import discord
 from discord.ext import commands
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 DATA_DIR = "data"
 RECIPES_FILE = os.path.join(DATA_DIR, "recipes.json")
@@ -18,17 +18,14 @@ def _load_json(path: str, default):
     except Exception:
         return default
 
-
 def _save_json(path: str, data: Any):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
-
 def _get_learned(user_id: int) -> Dict[str, List[Dict[str, str]]]:
     store = _load_json(LEARNED_FILE, default={})
     return store.get(str(user_id), {})
-
 
 def _load_grouped_recipes_from_file() -> Dict[str, List[Dict[str, str]]]:
     raw = _load_json(RECIPES_FILE, default=[])
@@ -54,253 +51,611 @@ def _load_grouped_recipes_from_file() -> Dict[str, List[Dict[str, str]]]:
                 })
     return grouped
 
-
 # ---------------- Hub <-> Refresh API ----------------
 async def refresh_hub(interaction: discord.Interaction, user_id: int, section: str):
+    """
+    Re-render the same hub message in place where possible.
+    For modal submissions, we may send a new ephemeral hub after ack.
+    """
     hub_cog: "Hub" = interaction.client.get_cog("Hub")  # type: ignore
     if not hub_cog:
         return
-    embed = await hub_cog.render_section(interaction, user_id, section)
-    view = HubView(hub_cog, user_id, section=section, debug=hub_cog.bot.debug_mode)
+    embed, view = await hub_cog.render(user_id, section)
     try:
-        if not interaction.response.is_done():
+        # If we are inside a component interaction tied to the hub message:
+        if not interaction.response.is_done() and getattr(interaction, "message", None):
             await interaction.response.edit_message(embed=embed, view=view)
         else:
-            await interaction.edit_original_response(embed=embed, view=view)
+            # Fallback: send a fresh ephemeral hub (modal submit flow)
+            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
     except discord.NotFound:
         pass
 
-
-# ---------------- Hub View ----------------
+# ---------------- Main Hub View ----------------
 class HubView(discord.ui.View):
-    def __init__(self, cog: "Hub", user_id: int, section: str = "home", debug: bool = False):
+    def __init__(self, cog: "Hub", user_id: int, section: str = "home"):
         super().__init__(timeout=600)
         self.cog = cog
         self.user_id = user_id
         self.section = section
-        self.debug = debug
 
-        # Top nav
-        self.add_item(self.HomeBtn(self))
-        self.add_item(self.ProfileBtn(self))
-        self.add_item(self.ProfessionsBtn(self))
-        self.add_item(self.RecipesBtn(self))
-        self.add_item(self.MarketBtn(self))
+        # Top nav (persistent, edits in place)
+        self.add_item(self._NavBtn("🏰 Home", "home", discord.ButtonStyle.primary))
+        self.add_item(self._NavBtn("👤 Profile", "profile", discord.ButtonStyle.secondary))
+        self.add_item(self._NavBtn("🛠️ Professions", "professions", discord.ButtonStyle.secondary))
+        self.add_item(self._NavBtn("📜 Recipes", "recipes", discord.ButtonStyle.secondary))
+        self.add_item(self._NavBtn("💰 Market", "market", discord.ButtonStyle.success))
 
-        # Extra features
-        if section == "home":
-            self.add_item(self.GearBtn())
-            self.add_item(self.LoreBtn())
+        # Extras on home
+        if self.section == "home":
+            self.add_item(self._GearBtn())
+            self.add_item(self._LoreBtn())
 
-        # Utilities
-        if self.section != "home":
-            self.add_item(self.BackBtn(self))
+        # Debug utilities
         if self.cog.bot.debug_mode:
-            self.add_item(self.DebugBtn(self))
-            self.add_item(self.StateBtn(self))
+            self.add_item(self._DebugStateBtn())
 
-    # --------- Base Nav ---------
-    class _BaseNavButton(discord.ui.Button):
-        def __init__(self, label: str, style: discord.ButtonStyle, section: str, emoji: Optional[str] = None):
-            super().__init__(label=label, style=style, emoji=emoji)
+    # ---------- Nav Button ----------
+    class _NavBtn(discord.ui.Button):
+        def __init__(self, label: str, section: str, style: discord.ButtonStyle):
+            super().__init__(label=label, style=style)
             self._section = section
 
-        async def callback(self, interaction: discord.Interaction):
+        async def callback(self, itx: discord.Interaction):
             v: HubView = self.view  # type: ignore
-            if interaction.user.id != v.user_id:
-                return await interaction.response.send_message("⚠️ This hub belongs to someone else. Use `/home` to open yours.", ephemeral=True)
-            embed = await v.cog.render_section(interaction, v.user_id, self._section, debug=v.debug)
-            await interaction.response.edit_message(embed=embed, view=HubView(v.cog, v.user_id, section=self._section, debug=v.debug))
+            # Only owner can use their hub
+            if itx.user.id != v.user_id:
+                return await itx.response.send_message("⚠️ This hub belongs to someone else.", ephemeral=True)
+            embed, view = await v.cog.render(v.user_id, self._section)
+            await itx.response.edit_message(embed=embed, view=view)
 
-    class HomeBtn(_BaseNavButton):
-        def __init__(self, view): super().__init__("Home", discord.ButtonStyle.primary, "home", "🏰")
+    # ---------- Gear ----------
+    class _GearBtn(discord.ui.Button):
+        def __init__(self): super().__init__(label="⚔️ Gear Lookup", style=discord.ButtonStyle.secondary)
+        async def callback(self, itx: discord.Interaction):
+            e = discord.Embed(title="⚔️ Gear Lookup", description="Coming soon: search gear stats & sources.", color=discord.Color.blurple())
+            await itx.response.send_message(embed=e, ephemeral=True)
 
-    class ProfileBtn(_BaseNavButton):
-        def __init__(self, view): super().__init__("Profile", discord.ButtonStyle.secondary, "profile", "👤")
+    # ---------- Lore ----------
+    class _LoreBtn(discord.ui.Button):
+        def __init__(self): super().__init__(label="📖 Lore Drops", style=discord.ButtonStyle.secondary)
+        async def callback(self, itx: discord.Interaction):
+            e = discord.Embed(title="📜 Lore Drop", description="The **Riverlands** were once home to House Kordath...", color=discord.Color.gold())
+            e.set_footer(text="More lore integrations coming soon!")
+            await itx.response.send_message(embed=e, ephemeral=True)
 
-    class ProfessionsBtn(_BaseNavButton):
-        def __init__(self, view): super().__init__("Professions", discord.ButtonStyle.secondary, "professions", "🛠️")
-
-    class RecipesBtn(_BaseNavButton):
-        def __init__(self, view): super().__init__("Recipes", discord.ButtonStyle.secondary, "recipes", "📜")
-
-    class MarketBtn(_BaseNavButton):
-        def __init__(self, view): super().__init__("Market", discord.ButtonStyle.success, "market", "💰")
-
-    # --------- Utilities ---------
-    class BackBtn(discord.ui.Button):
-        def __init__(self, view):
-            super().__init__(label="⬅ Back", style=discord.ButtonStyle.secondary)
-
-        async def callback(self, interaction: discord.Interaction):
-            v: HubView = self.view  # type: ignore
-            embed = await v.cog.render_section(interaction, v.user_id, "home", debug=v.debug)
-            await interaction.response.edit_message(embed=embed, view=HubView(v.cog, v.user_id, section="home", debug=v.debug))
-
-    class DebugBtn(discord.ui.Button):
-        def __init__(self, view):
-            label = "🐞 Debug Mode: ON"
-            super().__init__(label=label, style=discord.ButtonStyle.danger)
-
-        async def callback(self, interaction: discord.Interaction):
-            v: HubView = self.view  # type: ignore
-            bot = v.cog.bot
-            bot.debug_mode = not bot.debug_mode
-            await interaction.response.send_message(f"✅ Debug mode toggled: **{'ON' if bot.debug_mode else 'OFF'}**", ephemeral=True)
-
-    class StateBtn(discord.ui.Button):
-        def __init__(self, view):
-            super().__init__(label="🔍 Inspect State", style=discord.ButtonStyle.secondary)
-
-        async def callback(self, interaction: discord.Interaction):
-            bot = interaction.client
+    # ---------- Debug ----------
+    class _DebugStateBtn(discord.ui.Button):
+        def __init__(self): super().__init__(label="🔍 Inspect State", style=discord.ButtonStyle.danger)
+        async def callback(self, itx: discord.Interaction):
+            bot = itx.client
             profiles = bot.get_cog("Profile").profiles if bot.get_cog("Profile") else {}
-            professions = bot.get_cog("Professions").artisan_registry if bot.get_cog("Professions") else {}
+            prof_reg = bot.get_cog("Professions").artisan_registry if bot.get_cog("Professions") else {}
             recipes = bot.get_cog("Recipes").learned if bot.get_cog("Recipes") else {}
             market = bot.get_cog("Market").market if bot.get_cog("Market") else {}
+            e = discord.Embed(title="🔍 Debug State", color=discord.Color.red())
+            e.add_field(name="Profiles", value=f"{len(profiles)} users", inline=True)
+            e.add_field(name="Professions", value=f"{len(prof_reg)} professions", inline=True)
+            e.add_field(name="Recipes", value=f"{len(recipes)} users", inline=True)
+            e.add_field(name="Market Listings", value=f"{len(market)} items", inline=True)
+            await itx.response.send_message(embed=e, ephemeral=True)
 
-            embed = discord.Embed(title="🔍 Debug State", color=discord.Color.red())
-            embed.add_field(name="Profiles", value=f"{len(profiles)} users", inline=True)
-            embed.add_field(name="Professions", value=f"{len(professions)} professions", inline=True)
-            embed.add_field(name="Recipes", value=f"{len(recipes)} users", inline=True)
-            embed.add_field(name="Market Listings", value=f"{len(market)} items", inline=True)
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+# ---------------- Section Views ----------------
+class ProfilePanel(discord.ui.View):
+    def __init__(self, hub: "Hub", user_id: int):
+        super().__init__(timeout=600)
+        self.hub = hub
+        self.user_id = user_id
+        self.add_item(self._SetClassesBtn(hub, user_id))
+        self.add_item(self._AddWishlistBtn(hub, user_id))
+        self.add_item(self._RemoveWishlistBtn(hub, user_id))
 
-    # --------- Extra Features ---------
-    class GearBtn(discord.ui.Button):
-        def __init__(self):
-            super().__init__(label="⚔️ Gear Lookup", style=discord.ButtonStyle.secondary)
+    # ---- Set Classes
+    class _SetClassesBtn(discord.ui.Button):
+        def __init__(self, hub: "Hub", user_id: int):
+            super().__init__(label="🎭 Set Classes", style=discord.ButtonStyle.primary)
+            self.hub = hub
+            self.user_id = user_id
+        async def callback(self, itx: discord.Interaction):
+            if itx.user.id != self.user_id:
+                return await itx.response.send_message("⚠️ Not your profile.", ephemeral=True)
+            await itx.response.send_modal(SetClassesModal(self.hub, self.user_id))
 
-        async def callback(self, interaction: discord.Interaction):
-            embed = discord.Embed(
-                title="⚔️ Gear Lookup",
-                description="Coming soon! You'll be able to search gear stats, rarity, and sources here.",
-                color=discord.Color.blurple()
-            )
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+    # ---- Add Wishlist
+    class _AddWishlistBtn(discord.ui.Button):
+        def __init__(self, hub: "Hub", user_id: int):
+            super().__init__(label="➕ Add Wishlist Item", style=discord.ButtonStyle.success)
+            self.hub = hub
+            self.user_id = user_id
+        async def callback(self, itx: discord.Interaction):
+            if itx.user.id != self.user_id:
+                return await itx.response.send_message("⚠️ Not your profile.", ephemeral=True)
+            await itx.response.send_modal(AddWishlistModal(self.hub, self.user_id))
 
-    class LoreBtn(discord.ui.Button):
-        def __init__(self):
-            super().__init__(label="📖 Lore Drops", style=discord.ButtonStyle.secondary)
+    # ---- Remove Wishlist
+    class _RemoveWishlistBtn(discord.ui.Button):
+        def __init__(self, hub: "Hub", user_id: int):
+            super().__init__(label="➖ Remove Wishlist Item", style=discord.ButtonStyle.secondary)
+            self.hub = hub
+            self.user_id = user_id
+        async def callback(self, itx: discord.Interaction):
+            prof = self.hub.profile.get_profile(self.user_id)
+            items = prof.get("wishlist", [])
+            if not items:
+                return await itx.response.send_message("📭 Wishlist is empty.", ephemeral=True)
+            options = [discord.SelectOption(label=i, value=i) for i in items[:25]]
+            v = discord.ui.View(timeout=120)
+            sel = discord.ui.Select(placeholder="Select item to remove…", options=options, max_values=1)
+            async def on_pick(sitx: discord.Interaction):
+                name = sel.values[0]
+                self.hub.profile.remove_wishlist_item(self.user_id, name)
+                await sitx.response.send_message(f"🗑️ Removed **{name}**.", ephemeral=True)
+                await refresh_hub(sitx, self.user_id, "profile")
+            sel.callback = on_pick
+            v.add_item(sel)
+            await itx.response.send_message("Choose an item:", view=v, ephemeral=True)
 
-        async def callback(self, interaction: discord.Interaction):
-            embed = discord.Embed(
-                title="📜 Lore Drop",
-                description="Did you know?\n\nThe **Riverlands** were once home to House Kordath...",
-                color=discord.Color.gold()
-            )
-            embed.set_footer(text="More lore integrations coming soon!")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+class ProfessionsPanel(discord.ui.View):
+    CATS = {
+        "⛏️ Gathering": ["Fishing", "Herbalism", "Hunting", "Lumberjacking", "Mining"],
+        "⚙️ Processing": ["Alchemy", "Animal Husbandry", "Cooking", "Farming", "Lumber Milling", "Metalworking", "Stonemasonry", "Tanning", "Weaving"],
+        "🛠️ Crafting":   ["Arcane Engineering", "Armor Smithing", "Carpentry", "Jewelry", "Leatherworking", "Scribing", "Tailoring", "Weapon Smithing"],
+    }
+    TIERS = [
+        discord.SelectOption(label="Novice (1)", value="1"),
+        discord.SelectOption(label="Apprentice (2)", value="2"),
+        discord.SelectOption(label="Journeyman (3)", value="3"),
+        discord.SelectOption(label="Master (4)", value="4"),
+        discord.SelectOption(label="Grandmaster (5)", value="5"),
+    ]
 
+    def __init__(self, hub: "Hub", user_id: int):
+        super().__init__(timeout=600)
+        self.hub = hub
+        self.user_id = user_id
+        for label in self.CATS.keys():
+            self.add_item(self._CatBtn(hub, user_id, label))
+        self.add_item(self._RemoveBtn(hub, user_id))
+
+    class _CatBtn(discord.ui.Button):
+        def __init__(self, hub: "Hub", user_id: int, label: str):
+            super().__init__(label=label, style=discord.ButtonStyle.primary)
+            self.hub = hub
+            self.user_id = user_id
+            self.label_str = label
+        async def callback(self, itx: discord.Interaction):
+            profs = ProfessionsPanel.CATS[self.label_str]
+            options = [discord.SelectOption(label=p, value=p) for p in profs]
+            sel = discord.ui.Select(placeholder="Select profession…", options=options, max_values=1)
+            v = discord.ui.View(timeout=120)
+            v.add_item(sel)
+
+            async def on_pick(sitx: discord.Interaction):
+                profession = sel.values[0]
+                # Tier selection
+                tier_sel = discord.ui.Select(placeholder=f"Tier for {profession}", options=ProfessionsPanel.TIERS, max_values=1)
+                v2 = discord.ui.View(timeout=120)
+                v2.add_item(tier_sel)
+                async def on_tier(done_itx: discord.Interaction):
+                    tier = tier_sel.values[0]
+                    ok = self.hub.prof.set_user_profession(self.user_id, profession, tier)
+                    if ok:
+                        await done_itx.response.send_message(f"✅ Set **{profession}** to Tier **{tier}**.", ephemeral=True)
+                        await refresh_hub(done_itx, self.user_id, "professions")
+                        await refresh_hub(done_itx, self.user_id, "profile")
+                    else:
+                        await done_itx.response.send_message("⚠️ You can only have up to 2 professions. Remove one first.", ephemeral=True)
+                tier_sel.callback = on_tier
+                await sitx.response.send_message(f"Select tier for **{profession}**:", view=v2, ephemeral=True)
+
+            sel.callback = on_pick
+            await itx.response.send_message("Choose a profession:", view=v, ephemeral=True)
+
+    class _RemoveBtn(discord.ui.Button):
+        def __init__(self, hub: "Hub", user_id: int):
+            super().__init__(label="❌ Remove Profession", style=discord.ButtonStyle.danger)
+            self.hub = hub
+            self.user_id = user_id
+        async def callback(self, itx: discord.Interaction):
+            profs = self.hub.prof.get_user_professions(self.user_id)
+            if not profs:
+                return await itx.response.send_message("You have no professions to remove.", ephemeral=True)
+            options = [discord.SelectOption(label=p["name"], value=p["name"]) for p in profs[:25]]
+            v = discord.ui.View(timeout=120)
+            sel = discord.ui.Select(placeholder="Select profession to remove…", options=options, max_values=1)
+            async def on_pick(sitx: discord.Interaction):
+                name = sel.values[0]
+                changed = self.hub.prof.remove_user_profession(self.user_id, name)
+                if changed:
+                    await sitx.response.send_message(f"🗑️ Removed **{name}**.", ephemeral=True)
+                    await refresh_hub(sitx, self.user_id, "professions")
+                    await refresh_hub(sitx, self.user_id, "profile")
+                else:
+                    await sitx.response.send_message("⚠️ You don't have that profession.", ephemeral=True)
+            sel.callback = on_pick
+            v.add_item(sel)
+            await itx.response.send_message("Choose a profession to remove:", view=v, ephemeral=True)
+
+class RecipesPanel(discord.ui.View):
+    def __init__(self, hub: "Hub", user_id: int):
+        super().__init__(timeout=600)
+        self.hub = hub
+        self.user_id = user_id
+        self.add_item(self._LearnBtn(hub, user_id))
+        self.add_item(self._SearchBtn(hub, user_id))
+        self.add_item(self._ViewLearnedBtn(hub, user_id))
+
+    class _LearnBtn(discord.ui.Button):
+        def __init__(self, hub: "Hub", user_id: int):
+            super().__init__(label="📘 Learn Recipe", style=discord.ButtonStyle.primary)
+            self.hub = hub; self.user_id = user_id
+        async def callback(self, itx: discord.Interaction):
+            await itx.response.send_modal(LearnRecipeModal(self.hub, self.user_id))
+
+    class _SearchBtn(discord.ui.Button):
+        def __init__(self, hub: "Hub", user_id: int):
+            super().__init__(label="🔍 Search Recipes", style=discord.ButtonStyle.secondary)
+            self.hub = hub; self.user_id = user_id
+        async def callback(self, itx: discord.Interaction):
+            await itx.response.send_modal(SearchRecipeModal(self.hub, self.user_id))
+
+    class _ViewLearnedBtn(discord.ui.Button):
+        def __init__(self, hub: "Hub", user_id: int):
+            super().__init__(label="📖 Learned Recipes", style=discord.ButtonStyle.success)
+            self.hub = hub; self.user_id = user_id
+        async def callback(self, itx: discord.Interaction):
+            # Build paginated view
+            learned = self.hub.recipes.get_user_recipes(self.user_id)
+            items: List[Tuple[str, str]] = []  # (prof, name)
+            for prof, arr in learned.items():
+                for r in arr:
+                    items.append((prof, r.get("name","?")))
+            if not items:
+                return await itx.response.send_message("You haven't learned any recipes yet.", ephemeral=True)
+            embed, view = self.hub.make_learned_embed(self.user_id, items, page=1)
+            await itx.response.send_message(embed=embed, view=view, ephemeral=True)
+
+class MarketPanel(discord.ui.View):
+    def __init__(self, hub: "Hub", user_id: int):
+        super().__init__(timeout=600)
+        self.hub = hub
+        self.user_id = user_id
+        self.add_item(self._AddBtn(hub, user_id))
+        self.add_item(self._RemoveBtn(hub, user_id))
+        self.add_item(self._MyListBtn(hub, user_id))
+        self.add_item(self._SearchBtn(hub, user_id))
+
+    class _AddBtn(discord.ui.Button):
+        def __init__(self, hub: "Hub", user_id: int):
+            super().__init__(label="➕ Add Listing", style=discord.ButtonStyle.success)
+            self.hub = hub; self.user_id = user_id
+        async def callback(self, itx: discord.Interaction):
+            await itx.response.send_modal(AddListingModal(self.hub, self.user_id))
+
+    class _RemoveBtn(discord.ui.Button):
+        def __init__(self, hub: "Hub", user_id: int):
+            super().__init__(label="🗑️ Remove Listing", style=discord.ButtonStyle.secondary)
+            self.hub = hub; self.user_id = user_id
+        async def callback(self, itx: discord.Interaction):
+            listings = self.hub.market.get_user_listings(self.user_id)
+            if not listings:
+                return await itx.response.send_message("You have no active listings.", ephemeral=True)
+            options = [discord.SelectOption(label=l["item"], value=l["item"]) for l in listings[:25]]
+            sel = discord.ui.Select(placeholder="Select listing to remove…", options=options, max_values=1)
+            v = discord.ui.View(timeout=120)
+            v.add_item(sel)
+            async def on_pick(sitx: discord.Interaction):
+                item = sel.values[0]
+                ok = self.hub.market.remove_listing(self.user_id, item)
+                if ok:
+                    await sitx.response.send_message(f"🗑️ Removed **{item}**.", ephemeral=True)
+                    await refresh_hub(sitx, self.user_id, "market")
+                    await refresh_hub(sitx, self.user_id, "profile")
+                else:
+                    await sitx.response.send_message("⚠️ Listing not found.", ephemeral=True)
+            sel.callback = on_pick
+            await itx.response.send_message("Choose a listing:", view=v, ephemeral=True)
+
+    class _MyListBtn(discord.ui.Button):
+        def __init__(self, hub: "Hub", user_id: int):
+            super().__init__(label="📦 My Listings", style=discord.ButtonStyle.primary)
+            self.hub = hub; self.user_id = user_id
+        async def callback(self, itx: discord.Interaction):
+            embed, view = self.hub.make_my_listings_embed(self.user_id, page=1)
+            await itx.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    class _SearchBtn(discord.ui.Button):
+        def __init__(self, hub: "Hub", user_id: int):
+            super().__init__(label="🔎 Search Market", style=discord.ButtonStyle.secondary)
+            self.hub = hub; self.user_id = user_id
+        async def callback(self, itx: discord.Interaction):
+            await itx.response.send_modal(SearchMarketModal(self.hub, self.user_id))
+
+# ---------------- Modals ----------------
+class SetClassesModal(discord.ui.Modal, title="🎭 Set Classes"):
+    def __init__(self, hub: "Hub", user_id: int):
+        super().__init__()
+        self.hub = hub; self.user_id = user_id
+        self.primary = discord.ui.TextInput(label="Primary Class", placeholder="e.g., Fighter", required=False, max_length=32)
+        self.secondary = discord.ui.TextInput(label="Secondary Class", placeholder="e.g., Rogue", required=False, max_length=32)
+        self.add_item(self.primary); self.add_item(self.secondary)
+    async def on_submit(self, itx: discord.Interaction):
+        self.hub.profile.set_classes(self.user_id, str(self.primary.value or ""), str(self.secondary.value or ""))
+        await itx.response.send_message("✅ Classes updated.", ephemeral=True)
+        await refresh_hub(itx, self.user_id, "profile")
+
+class AddWishlistModal(discord.ui.Modal, title="➕ Add Wishlist Item"):
+    def __init__(self, hub: "Hub", user_id: int):
+        super().__init__()
+        self.hub = hub; self.user_id = user_id
+        self.item = discord.ui.TextInput(label="Item name", placeholder="Exact or partial", required=True, max_length=100)
+        self.add_item(self.item)
+    async def on_submit(self, itx: discord.Interaction):
+        ok = self.hub.profile.add_wishlist_item(self.user_id, str(self.item.value))
+        msg = f"✅ Added **{self.item.value}**." if ok else "⚠️ Already on your wishlist."
+        await itx.response.send_message(msg, ephemeral=True)
+        await refresh_hub(itx, self.user_id, "profile")
+
+class LearnRecipeModal(discord.ui.Modal, title="📘 Learn Recipe"):
+    def __init__(self, hub: "Hub", user_id: int):
+        super().__init__()
+        self.hub = hub; self.user_id = user_id
+        self.profession = discord.ui.TextInput(label="Profession", placeholder="e.g., Herbalism", required=True, max_length=40)
+        self.name = discord.ui.TextInput(label="Recipe Name", placeholder="Enter the exact or partial name", required=True, max_length=100)
+        self.add_item(self.profession); self.add_item(self.name)
+    async def on_submit(self, itx: discord.Interaction):
+        pro = str(self.profession.value).strip()
+        nm = str(self.name.value).strip()
+        link = self.hub.recipes.get_recipe_link(nm)
+        ok = self.hub.recipes.add_learned_recipe(self.user_id, pro, nm, link)
+        if ok:
+            await itx.response.send_message(f"✅ Learned **{nm}** ({pro}).", ephemeral=True)
+            await refresh_hub(itx, self.user_id, "recipes")
+            await refresh_hub(itx, self.user_id, "profile")
+        else:
+            await itx.response.send_message("⚠️ Already learned.", ephemeral=True)
+
+class SearchRecipeModal(discord.ui.Modal, title="🔍 Search Recipes"):
+    def __init__(self, hub: "Hub", user_id: int):
+        super().__init__()
+        self.hub = hub; self.user_id = user_id
+        self.query = discord.ui.TextInput(label="Search", placeholder="e.g., Tincture", required=True, max_length=100)
+        self.prof = discord.ui.TextInput(label="Profession (optional)", placeholder="e.g., Herbalism", required=False, max_length=40)
+        self.add_item(self.query); self.add_item(self.prof)
+    async def on_submit(self, itx: discord.Interaction):
+        p = str(self.prof.value).strip() or None
+        hits = self.hub.recipes.search_recipes(str(self.query.value), professions=[p] if p else None, limit=25)
+        if not hits:
+            return await itx.response.send_message("No matches.", ephemeral=True)
+        lines = []
+        for h in hits[:10]:
+            lvl = f" (Lv {h['level']})" if h.get("level") else ""
+            link = f" — <{h['link']}>" if h.get("link") else ""
+            lines.append(f"• **{h['name']}** — *{h['profession']}*{lvl}{link}")
+        e = discord.Embed(title=f"🔍 Results for “{self.query.value}”", description="\n".join(lines), color=discord.Color.green())
+        await itx.response.send_message(embed=e, ephemeral=True)
+
+class AddListingModal(discord.ui.Modal, title="➕ Add Listing"):
+    def __init__(self, hub: "Hub", user_id: int):
+        super().__init__()
+        self.hub = hub; self.user_id = user_id
+        self.item = discord.ui.TextInput(label="Item", required=True, max_length=100)
+        self.price = discord.ui.TextInput(label="Price (gold, number)", required=True, max_length=10)
+        self.village = discord.ui.TextInput(label="Village", required=True, max_length=40)
+        self.note = discord.ui.TextInput(label="Note (optional)", required=False, max_length=120)
+        self.add_item(self.item); self.add_item(self.price); self.add_item(self.village); self.add_item(self.note)
+    async def on_submit(self, itx: discord.Interaction):
+        try:
+            price_i = int(str(self.price.value).strip())
+        except Exception:
+            price_i = None
+        entry = self.hub.market.add_listing(self.user_id, str(self.item.value).strip(), price_i, str(self.village.value).strip(), str(self.note.value or "").strip())
+        await itx.response.send_message(f"✅ Listed **{entry['item']}** for **{entry['price_str']}** in **{entry['village']}**.", ephemeral=True)
+        await refresh_hub(itx, self.user_id, "market")
+        await refresh_hub(itx, self.user_id, "profile")
+
+class SearchMarketModal(discord.ui.Modal, title="🔎 Search Market"):
+    def __init__(self, hub: "Hub", user_id: int):
+        super().__init__()
+        self.hub = hub; self.user_id = user_id
+        self.query = discord.ui.TextInput(label="Search", placeholder="e.g., Tincture", required=True, max_length=100)
+        self.add_item(self.query)
+    async def on_submit(self, itx: discord.Interaction):
+        q = str(self.query.value).lower().strip()
+        hits = [m for m in self.hub.market.market if q in str(m.get("item","")).lower()]
+        if not hits:
+            return await itx.response.send_message("No market matches.", ephemeral=True)
+        lines = [f"• **{m['item']}** — {m.get('price_str','?')} | {m['village']} (seller: <@{m['seller_id']}>)" for m in hits[:15]]
+        e = discord.Embed(title=f"🔎 Market results for “{self.query.value}”", description="\n".join(lines), color=discord.Color.teal())
+        await itx.response.send_message(embed=e, ephemeral=True)
 
 # ---------------- Hub Cog ----------------
 class Hub(commands.Cog):
-    """One-message hub with live-refreshing panels + debugging tools."""
+    """Single-message hub with full UI flows (ephemeral, edit-in-place where possible)."""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.hybrid_command(name="home", description="Open your guild hub")
-    async def home(self, ctx: commands.Context):
-        embed = await self.render_section(None, ctx.author.id, "home")
-        view = HubView(self, ctx.author.id, section="home", debug=self.bot.debug_mode)
-        if hasattr(ctx, "interaction") and ctx.interaction is not None:
-            await ctx.interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-        else:
-            await ctx.send(embed=embed, view=view)
+        # Handy accessors (bound at use-time)
+        # We don't cache cogs here to avoid race with setup order.
 
-    # Router
-    async def render_section(self, interaction: Optional[discord.Interaction], user_id: int, section: str, debug: bool = False) -> discord.Embed:
-        if self.bot.debug_mode:
-            self.bot.logger = getattr(self.bot, "logger", None)
-            if self.bot.logger:
-                self.bot.logger.info(f"[DEBUG] Hub refresh: user={user_id} section={section}")
+    # Quick properties
+    @property
+    def profile(self):
+        return self.bot.get_cog("Profile")
+    @property
+    def prof(self):
+        return self.bot.get_cog("Professions")
+    @property
+    def recipes(self):
+        return self.bot.get_cog("Recipes")
+    @property
+    def market(self):
+        return self.bot.get_cog("Market")
 
-        if section == "home":         return await self.render_home(user_id)
-        if section == "profile":      return await self.render_profile(interaction, user_id)
-        if section == "professions":  return await self.render_professions(interaction, user_id)
-        if section == "recipes":      return await self.render_recipes(user_id)
-        if section == "market":       return await self.render_market(user_id)
-        return await self.render_home(user_id)
+    # ---------- Public render ----------
+    async def render(self, user_id: int, section: str) -> tuple[discord.Embed, discord.ui.View]:
+        if section == "home":
+            return self.render_home(user_id)
+        if section == "profile":
+            return self.render_profile(user_id)
+        if section == "professions":
+            return self.render_professions(user_id)
+        if section == "recipes":
+            return self.render_recipes(user_id)
+        if section == "market":
+            return self.render_market(user_id)
+        return self.render_home(user_id)
 
-    # Embeds
-    async def render_home(self, user_id: int) -> discord.Embed:
+    def render_home(self, user_id: int):
         e = discord.Embed(
             title="🏰 Guild Codex",
-            description="Your guide to artisans, recipes, and market intel.\nUse the buttons below.",
+            description="Your private control panel for **Profile**, **Professions**, **Recipes**, and **Market**.\nUse the buttons above. (All actions are **ephemeral** — only you can see them.)",
             color=discord.Color.gold(),
         )
+        v = HubView(self, user_id, section="home")
         e.set_footer(text="Ashes of Creation — Guild Codex")
-        return e
+        return e, v
 
-    async def render_profile(self, interaction: Optional[discord.Interaction], user_id: int) -> discord.Embed:
-        profile_cog = self.bot.get_cog("Profile")
-        if profile_cog:
-            user = (interaction.user if interaction else self.bot.get_user(user_id))  # type: ignore
-            return profile_cog.build_profile_embed(user)
-        return discord.Embed(title="👤 Profile", description="Profile unavailable.", color=discord.Color.red())
+    def render_profile(self, user_id: int):
+        user = self.bot.get_user(user_id)
+        embed = self.profile.build_profile_embed(user) if self.profile else discord.Embed(title="👤 Profile", description="Unavailable", color=discord.Color.red())
+        view = HubView(self, user_id, section="profile")
+        # Add section controls under nav
+        for item in ProfilePanel(self, user_id).children:
+            view.add_item(item)
+        return embed, view
 
-    async def render_professions(self, interaction: Optional[discord.Interaction], user_id: int) -> discord.Embed:
-        prof_cog = self.bot.get_cog("Professions")
-        e = discord.Embed(title="🛠️ Professions", description="Choose a category below:", color=discord.Color.orange())
-        if prof_cog:
-            profs = prof_cog.get_user_professions(user_id)
+    def render_professions(self, user_id: int):
+        e = discord.Embed(title="🛠️ Professions", color=discord.Color.orange())
+        if self.prof:
+            profs = self.prof.get_user_professions(user_id)
             if profs:
-                s = "\n".join([f"• {p['name']} — Tier {p.get('tier', '1')}" for p in profs])
+                s = "\n".join([f"• {p['name']} — Tier {p.get('tier','1')}" for p in profs])
             else:
                 s = "*You have not selected any professions yet.*"
             e.add_field(name="Your Professions", value=s, inline=False)
+        v = HubView(self, user_id, section="professions")
+        for item in ProfessionsPanel(self, user_id).children:
+            v.add_item(item)
+        return e, v
 
-        # Add profession category buttons dynamically
-        view = discord.ui.View(timeout=None)
-        for label, profs in {
-            "⛏️ Gathering": ["Fishing", "Herbalism", "Hunting", "Lumberjacking", "Mining"],
-            "⚙️ Processing": ["Alchemy", "Animal Husbandry", "Cooking", "Farming", "Lumber Milling", "Metalworking", "Stonemasonry", "Tanning", "Weaving"],
-            "🛠️ Crafting": ["Arcane Engineering", "Armor Smithing", "Carpentry", "Jewelry", "Leatherworking", "Scribing", "Tailoring", "Weapon Smithing"]
-        }.items():
-            button = discord.ui.Button(label=label, style=discord.ButtonStyle.primary)
-            async def make_dropdown_callback(inter, profs=profs):
-                opts = [discord.SelectOption(label=p, value=p) for p in profs]
-                dropdown = discord.ui.Select(placeholder=f"Select profession...", options=opts)
-                v2 = discord.ui.View(timeout=None)
-                v2.add_item(dropdown)
-                async def on_select(sitx: discord.Interaction):
-                    prof = dropdown.values[0]
-                    await sitx.response.send_message(f"Now select a tier for {prof}. Use `/setprofession {prof} <tier>`.", ephemeral=True)
-                dropdown.callback = on_select
-                await inter.response.send_message(f"Choose your profession:", view=v2, ephemeral=True)
-            button.callback = make_dropdown_callback
-            view.add_item(button)
-
-        if interaction:
-            await interaction.response.send_message(embed=e, view=view, ephemeral=True)
-        return e
-
-    async def render_recipes(self, user_id: int) -> discord.Embed:
-        e = discord.Embed(
-            title="📜 Recipes",
-            description="• **/learnrecipe** to learn\n• **/unlearnrecipe** to remove\n• **/searchrecipe** to find",
-            color=discord.Color.green(),
-        )
+    def render_recipes(self, user_id: int):
         learned = _get_learned(user_id)
         total = sum(len(v) for v in learned.values())
-        e.add_field(name="📘 Learned Recipes", value=f"{total} total" if total else "*None yet*", inline=False)
         grouped = _load_grouped_recipes_from_file()
-        e.add_field(name="📚 Recipe Catalog", value=f"{sum(len(v) for v in grouped.values())} items", inline=False)
-        return e
+        e = discord.Embed(
+            title="📜 Recipes",
+            description="Learn, search, and browse your learned recipes.",
+            color=discord.Color.green()
+        )
+        e.add_field(name="📘 Learned", value=f"{total} total" if total else "*None yet*", inline=False)
+        e.add_field(name="📚 Catalog", value=f"{sum(len(v) for v in grouped.values())} items", inline=True)
+        v = HubView(self, user_id, section="recipes")
+        for item in RecipesPanel(self, user_id).children:
+            v.add_item(item)
+        return e, v
 
-    async def render_market(self, user_id: int) -> discord.Embed:
-        e = discord.Embed(title="💰 Market", description="Post listings and see wishlist matches.\nUse **/marketadd** and **/marketlist**.", color=discord.Color.teal())
-        market_cog = self.bot.get_cog("Market")
-        if market_cog:
-            my_listings = market_cog.get_user_listings(user_id)
-            if my_listings:
-                rows = "\n".join([f"• {m['item']} — {m.get('price_str', m.get('price','?'))} | {m['village']}" for m in my_listings[:8]])
-                e.add_field(name="My Listings", value=rows, inline=False)
+    def render_market(self, user_id: int):
+        e = discord.Embed(title="💰 Market", description="Add/remove listings, browse your listings, and search.", color=discord.Color.teal())
+        if self.market:
+            mine = self.market.get_user_listings(user_id)
+            if mine:
+                rows = "\n".join([f"• {m['item']} — {m.get('price_str','?')} | {m['village']}" for m in mine[:8]])
+                e.add_field(name="My Listings (first 8)", value=rows, inline=False)
             else:
                 e.add_field(name="My Listings", value="*No active listings*", inline=False)
-        return e
+        v = HubView(self, user_id, section="market")
+        for item in MarketPanel(self, user_id).children:
+            v.add_item(item)
+        return e, v
+
+    # ---------- Learned pagination ----------
+    def make_learned_embed(self, user_id: int, items: List[Tuple[str,str]], page: int, per: int = 10):
+        total_pages = max(1, (len(items) + per - 1) // per)
+        page = max(1, min(page, total_pages))
+        start, end = (page - 1)*per, (page - 1)*per + per
+        lines = [f"• **{name}** — *{prof}*" for prof, name in items[start:end]]
+        e = discord.Embed(title=f"📖 Learned Recipes — Page {page}/{total_pages}", description="\n".join(lines) or "*No items on this page*", color=discord.Color.green())
+        v = LearnedPagerView(self, user_id, items, page, total_pages)
+        return e, v
+
+    # ---------- Listings pagination ----------
+    def make_my_listings_embed(self, user_id: int, page: int, per: int = 10):
+        mine = self.market.get_user_listings(user_id) if self.market else []
+        total_pages = max(1, (len(mine) + per - 1) // per)
+        page = max(1, min(page, total_pages))
+        start, end = (page - 1)*per, (page - 1)*per + per
+        rows = [f"• **{m['item']}** — {m.get('price_str','?')} | {m['village']}" + (f" — {m['note']}" if m.get('note') else "") for m in mine[start:end]]
+        e = discord.Embed(title=f"💰 My Listings — Page {page}/{total_pages}", description="\n".join(rows) or "*No items on this page*", color=discord.Color.teal())
+        v = ListingsPagerView(self, user_id, page, total_pages)
+        return e, v
+
+# ---------- Pagination Views ----------
+class LearnedPagerView(discord.ui.View):
+    def __init__(self, hub: Hub, user_id: int, items: List[Tuple[str,str]], page: int, total_pages: int):
+        super().__init__(timeout=300)
+        self.hub = hub; self.user_id = user_id
+        self.items = items; self.page = page; self.total_pages = total_pages
+        self.add_item(self._PrevBtn(self)); self.add_item(self._NextBtn(self))
+    class _PrevBtn(discord.ui.Button):
+        def __init__(self, parent): super().__init__(label="◀ Prev", style=discord.ButtonStyle.secondary); self.p = parent
+        async def callback(self, itx: discord.Interaction):
+            if self.p.page <= 1: return await itx.response.defer(ephemeral=True)
+            e, v = self.p.hub.make_learned_embed(self.p.user_id, self.p.items, self.p.page - 1)
+            await itx.response.edit_message(embed=e, view=v)
+    class _NextBtn(discord.ui.Button):
+        def __init__(self, parent): super().__init__(label="Next ▶", style=discord.ButtonStyle.secondary); self.p = parent
+        async def callback(self, itx: discord.Interaction):
+            if self.p.page >= self.p.total_pages: return await itx.response.defer(ephemeral=True)
+            e, v = self.p.hub.make_learned_embed(self.p.user_id, self.p.items, self.p.page + 1)
+            await itx.response.edit_message(embed=e, view=v)
+
+class ListingsPagerView(discord.ui.View):
+    def __init__(self, hub: Hub, user_id: int, page: int, total_pages: int):
+        super().__init__(timeout=300)
+        self.hub = hub; self.user_id = user_id; self.page = page; self.total_pages = total_pages
+        self.add_item(self._PrevBtn(self)); self.add_item(self._NextBtn(self))
+    class _PrevBtn(discord.ui.Button):
+        def __init__(self, p): super().__init__(label="◀ Prev", style=discord.ButtonStyle.secondary); self.p = p
+        async def callback(self, itx: discord.Interaction):
+            if self.p.page <= 1: return await itx.response.defer(ephemeral=True)
+            e, v = self.p.hub.make_my_listings_embed(self.p.user_id, self.p.page - 1)
+            await itx.response.edit_message(embed=e, view=v)
+    class _NextBtn(discord.ui.Button):
+        def __init__(self, p): super().__init__(label="Next ▶", style=discord.ButtonStyle.secondary); self.p = p
+        async def callback(self, itx: discord.Interaction):
+            if self.p.page >= self.p.total_pages: return await itx.response.defer(ephemeral=True)
+            e, v = self.p.hub.make_my_listings_embed(self.p.user_id, self.p.page + 1)
+            await itx.response.edit_message(embed=e, view=v)
+
+# ---------------- Commands: only to open hub (one-time), everything else is UI ----------------
+class Hub(commands.Cog):
+    async def setup_hook(self):
+        pass
+
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+
+    @commands.hybrid_command(name="home", description="Open your private hub (ephemeral)")
+    async def home(self, ctx: commands.Context):
+        embed, view = await self.render(ctx.author.id, "home")
+        if hasattr(ctx, "interaction") and ctx.interaction is not None:
+            await ctx.interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        else:
+            # Fallback to a normal message if needed (not typical)
+            await ctx.reply(embed=embed, view=view, delete_after=60)
+
+    # internal render
+    async def render(self, user_id: int, section: str) -> tuple[discord.Embed, discord.ui.View]:
+        if section == "home":         return self.render_home(user_id)
+        if section == "profile":      return self.render_profile(user_id)
+        if section == "professions":  return self.render_professions(user_id)
+        if section == "recipes":      return self.render_recipes(user_id)
+        if section == "market":       return self.render_market(user_id)
+        return self.render_home(user_id)
+
+    # The five render_* methods + helpers sit above (kept for clarity)
 
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(Hub(bot))
-
