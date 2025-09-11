@@ -45,6 +45,8 @@ MAILBOX_FILE   = _path("mailbox.json")
 REGISTRY_FILE  = _path("artisan_registry.json")
 GROUPED_FILE   = _path("recipes_grouped.json")
 ACTIVITY_FILE  = _path("activity.json")  # new, optional
+PROFESSIONS_FILE = _path("professions.json")
+
 
 # ---------- Public helper: record lightweight activity (optional by other cogs) ----------
 def log_activity(kind: str, user_id: int, detail: str):
@@ -134,6 +136,7 @@ class HubView(discord.ui.View):
             "mailbox": ("Mailbox", "build_mailbox_buttons"),
             "registry": ("Registry", "build_registry_buttons"),
             "trades": ("Trades", "build_trades_buttons"),
+            
         }
 
         if section not in cog_map:
