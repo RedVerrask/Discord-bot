@@ -1,213 +1,205 @@
-import os
-import json
-import logging
+# cogs/recipes.py
 import discord
 from discord.ext import commands
-from typing import Dict, List, Tuple, Any
+from discord.ui import View, Button, Modal, TextInput, Select
+from typing import Dict, List, Any, Optional
+
+from utils.data import load_json, save_json
 from cogs.hub import refresh_hub
-from cogs.professions import PROFESSION_ALIASES
 
-logger = logging.getLogger("AshesBot")
+RECIPES_FILE = "data/recipes.json"                 # flat list: [{name, profession, link?}, ...]
+RECIPES_GROUPED_FILE = "data/recipes_grouped.json" # grouped form: { profession: [{name, link?}, ...] }
+LEARNED_FILE = "data/learned_recipes.json"         # { user_id: { profession: [{name, link}, ...] } }
+ARTISAN_FILE = "data/artisan_registry.json"        # { recipe_name: [{user_id, tier}], ... }
 
-RECIPES_FILE = "data/recipes.json"          # flat or grouped accepted
-LEARNED_FILE = "data/learned_recipes.json"  # { user_id: { profession: [ {name, link} ] } }
-
-
-def _load_json(path: str, default: Any):
-    if not os.path.exists(path):
-        return default
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return default
-
-
-def _save_json(path: str, data: Any):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-
-def _norm_prof(name: str) -> str:
-    return PROFESSION_ALIASES.get(name, name)
-
+def _normalize_grouped(raw: Any) -> Dict[str, List[Dict[str, str]]]:
+    grouped: Dict[str, List[Dict[str, str]]] = {}
+    if isinstance(raw, dict):
+        for prof, items in raw.items():
+            for r in items or []:
+                name = r.get("name", "Unknown")
+                link = r.get("link") or r.get("url") or ""
+                grouped.setdefault(prof, []).append({"name": name, "profession": prof, "link": link})
+        return grouped
+    if isinstance(raw, list):
+        for r in raw:
+            if not isinstance(r, dict):
+                continue
+            name = r.get("name", "Unknown")
+            prof = r.get("profession", "Unknown")
+            link = r.get("link") or r.get("url") or ""
+            grouped.setdefault(prof, []).append({"name": name, "profession": prof, "link": link})
+        return grouped
+    return {}
 
 class Recipes(commands.Cog):
-    """
-    Accepts FLAT data/recipes.json:
-      [{"name": "...", "profession": "Armor Smithing", "level": "0", "url": "https://..."}]
-    Or grouped { "Armor Smithing": [ { ... }, ... ] }
+    """Handles recipes, learning/unlearning, searching, and registry sync."""
 
-    Normalizes into:
-      self.recipes_by_prof = { "Armor Smithing": [ {name, url, level}, ... ] }
-    """
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.recipes_by_prof: Dict[str, List[Dict]] = {}
-        self._name_index: List[Tuple[str, str, Dict]] = []  # (name_lower, profession, rec)
-        self.learned: Dict[str, Dict[str, List[Dict[str, str]]]] = _load_json(LEARNED_FILE, {})
-        self._load_and_normalize()
+        self.recipes: List[Dict[str, Any]] = load_json(RECIPES_FILE, [])
+        grouped_raw = load_json(RECIPES_GROUPED_FILE, {})
+        self.grouped: Dict[str, List[Dict[str, str]]] = _normalize_grouped(grouped_raw or self.recipes)
+        self.learned: Dict[str, Dict[str, List[Dict[str, str]]]] = load_json(LEARNED_FILE, {})
+        self.registry: Dict[str, List[Dict[str, Any]]] = load_json(ARTISAN_FILE, {})
 
-    def _load_and_normalize(self):
-        raw = _load_json(RECIPES_FILE, [])
-        by_prof: Dict[str, List[Dict]] = {}
+    # ---------------- persistence ----------------
+    def _save_learned(self):
+        save_json(LEARNED_FILE, self.learned)
 
-        if isinstance(raw, dict):
-            # grouped
-            for prof, lst in raw.items():
-                prof_n = _norm_prof(prof)
-                for entry in lst or []:
-                    if not isinstance(entry, dict):
-                        continue
-                    name = str(entry.get("name", "")).strip()
-                    if not name:
-                        continue
-                    level = str(entry.get("level", "")).strip()
-                    url = entry.get("url") or entry.get("link") or None
-                    by_prof.setdefault(prof_n, []).append({"name": name, "level": level, "url": url})
-        elif isinstance(raw, list):
-            # flat
-            for entry in raw:
-                if not isinstance(entry, dict):
-                    by_prof.setdefault("Unknown", []).append({"name": str(entry), "level": "", "url": None})
-                    continue
-                name = str(entry.get("name", "")).strip()
-                if not name:
-                    continue
-                prof = _norm_prof(str(entry.get("profession", "Unknown")).strip() or "Unknown")
-                level = str(entry.get("level", "")).strip()
-                url = entry.get("url") or entry.get("link") or None
-                by_prof.setdefault(prof, []).append({"name": name, "level": level, "url": url})
+    def _save_registry(self):
+        save_json(ARTISAN_FILE, self.registry)
 
-        for prof, arr in by_prof.items():
-            arr.sort(key=lambda r: r["name"].lower())
-
-        self.recipes_by_prof = dict(sorted(by_prof.items(), key=lambda kv: kv[0].lower()))
-        self._name_index = []
-        for prof, arr in self.recipes_by_prof.items():
-            for rec in arr:
-                self._name_index.append((rec["name"].lower(), prof, rec))
-
-        logger.info(f"[recipes] Loaded: {sum(len(v) for v in self.recipes_by_prof.values())} recipes across {len(self.recipes_by_prof)} professions.")
-
-    # ---------- learned storage ----------
-    def _ensure_user_prof_bucket(self, user_id: int, profession: str):
-        uid = str(user_id)
-        if uid not in self.learned:
-            self.learned[uid] = {}
-        if profession not in self.learned[uid]:
-            self.learned[uid][profession] = []
-
+    # ---------------- public API ----------------
     def get_user_recipes(self, user_id: int) -> Dict[str, List[Dict[str, str]]]:
         return self.learned.get(str(user_id), {})
 
-    def add_learned_recipe(self, user_id: int, profession: str, recipe_name: str, link: str | None):
-        profession = _norm_prof(profession)
-        self._ensure_user_prof_bucket(user_id, profession)
-        bucket = self.learned[str(user_id)][profession]
-        if any(r.get("name") == recipe_name for r in bucket):
+    def add_learned_recipe(self, user_id: int, profession: str, name: str, link: str = "") -> bool:
+        store = self.learned.setdefault(str(user_id), {})
+        bucket = store.setdefault(profession, [])
+        if any(r["name"].lower() == name.lower() for r in bucket):
             return False
-        bucket.append({"name": recipe_name, "link": link})
-        _save_json(LEARNED_FILE, self.learned)
+        bucket.append({"name": name, "link": link})
+        bucket.sort(key=lambda x: x["name"])
+        self._save_learned()
+
+        # registry: track tier too
+        profs_cog = self.bot.get_cog("Professions")
+        tier = "Unknown"
+        if profs_cog and hasattr(profs_cog, "get_user_professions"):
+            profs = profs_cog.get_user_professions(user_id)
+            for p in profs:
+                if p["name"].lower() == profession.lower():
+                    tier = p.get("tier", "Unknown")
+                    break
+
+        users = self.registry.setdefault(name, [])
+        if not any(u["user_id"] == user_id for u in users):
+            users.append({"user_id": user_id, "tier": tier})
+            self._save_registry()
         return True
 
-    def remove_learned_recipe(self, user_id: int, profession: str, recipe_name: str):
-        profession = _norm_prof(profession)
-        uid = str(user_id)
-        if uid in self.learned and profession in self.learned[uid]:
-            before = len(self.learned[uid][profession])
-            self.learned[uid][profession] = [r for r in self.learned[uid][profession] if r.get("name") != recipe_name]
-            if len(self.learned[uid][profession]) != before:
-                _save_json(LEARNED_FILE, self.learned)
-                return True
-        return False
+    def remove_learned_recipe(self, user_id: int, profession: str, name: str) -> bool:
+        store = self.learned.get(str(user_id), {})
+        bucket = store.get(profession, [])
+        before = len(bucket)
+        bucket[:] = [r for r in bucket if r.get("name", "").lower() != name.lower()]
+        removed = len(bucket) < before
+        if removed:
+            self._save_learned()
+            # update registry mapping
+            users = self.registry.get(name, [])
+            users = [u for u in users if u["user_id"] != user_id]
+            if users:
+                self.registry[name] = users
+            else:
+                self.registry.pop(name, None)
+            self._save_registry()
+        return removed
 
-    # ---------- lookup + search ----------
-    def get_recipe_link(self, recipe_name: str) -> str | None:
-        name_l = (recipe_name or "").lower()
-        if not name_l:
-            return None
-        for n, _, rec in self._name_index:
-            if n == name_l:
-                return rec.get("url")
-        for n, _, rec in self._name_index:
-            if name_l in n:
-                return rec.get("url")
-        return None
-
-    def search_recipes(self, query: str, professions: List[str] | None = None, limit: int = 25) -> List[Dict]:
-        if not query:
-            return []
-        q = query.lower().strip()
-        results: List[Dict] = []
-
-        if professions:
-            prof_set = { _norm_prof(p).lower() for p in professions }
-            for prof, arr in self.recipes_by_prof.items():
-                if prof.lower() not in prof_set:
-                    continue
-                for rec in arr:
-                    if q in rec["name"].lower():
-                        results.append({
-                            "name": rec["name"],
-                            "profession": prof,
-                            "link": rec.get("url"),
-                            "level": rec.get("level", ""),
-                        })
-                        if len(results) >= limit:
-                            return results
-        else:
-            for n, prof, rec in self._name_index:
-                if q in n:
+    def search_recipes(self, query: str, professions: Optional[List[str]] = None) -> List[Dict[str, str]]:
+        q = (query or "").lower().strip()
+        results: List[Dict[str, str]] = []
+        for prof, items in self.grouped.items():
+            if professions and prof not in professions:
+                continue
+            for r in items:
+                if q in r.get("name", "").lower():
+                    results.append(r)
+        if not results and self.recipes:
+            for r in self.recipes:
+                if q in r.get("name", "").lower():
+                    if professions and r.get("profession") not in professions:
+                        continue
                     results.append({
-                        "name": rec["name"],
-                        "profession": prof,
-                        "link": rec.get("url"),
-                        "level": rec.get("level", ""),
+                        "name": r.get("name", "Unknown"),
+                        "profession": r.get("profession", "Unknown"),
+                        "link": r.get("link") or r.get("url") or ""
                     })
-                    if len(results) >= limit:
-                        return results
-        return results
+        return results[:100]
 
-    # ---------- commands ----------
-    @commands.hybrid_command(name="learnrecipe", description="Save a recipe you learned")
-    async def learn_recipe_cmd(self, ctx: commands.Context, profession: str, recipe_name: str):
-        link = self.get_recipe_link(recipe_name)
-        ok = self.add_learned_recipe(ctx.author.id, profession, recipe_name, link)
-        if ok:
-            await ctx.reply(f"✅ Learned **{recipe_name}** ({_norm_prof(profession)}).", ephemeral=True)
-            if getattr(ctx, "interaction", None):
-                await refresh_hub(ctx.interaction, ctx.author.id, section="recipes")
-                await refresh_hub(ctx.interaction, ctx.author.id, section="profile")
-        else:
-            await ctx.reply("⚠️ You already learned that recipe.", ephemeral=True)
+    # ---------------- UI: Modals ----------------
+    class LearnRecipeModal(Modal, title="📗 Learn a Recipe"):
+        def __init__(self, cog: "Recipes", user_id: int):
+            super().__init__(timeout=240)
+            self.cog = cog
+            self.user_id = user_id
+            self.query = TextInput(label="Recipe Name", placeholder="e.g. Obsidian Dagger", required=True)
+            self.add_item(self.query)
 
-    @commands.hybrid_command(name="unlearnrecipe", description="Remove a learned recipe")
-    async def unlearn_recipe_cmd(self, ctx: commands.Context, profession: str, recipe_name: str):
-        ok = self.remove_learned_recipe(ctx.author.id, profession, recipe_name)
-        if ok:
-            await ctx.reply(f"🗑️ Removed **{recipe_name}** ({_norm_prof(profession)}).", ephemeral=True)
-            if getattr(ctx, "interaction", None):
-                await refresh_hub(ctx.interaction, ctx.author.id, section="recipes")
-                await refresh_hub(ctx.interaction, ctx.author.id, section="profile")
-        else:
-            await ctx.reply("⚠️ Not found in your learned list.", ephemeral=True)
+        async def on_submit(self, interaction: discord.Interaction):
+            # Limit results based on unlocked professions
+            profs_cog = interaction.client.get_cog("Professions")
+            prof_filter: Optional[List[str]] = None
+            if profs_cog and hasattr(profs_cog, "get_user_professions"):
+                prof_filter = [p["name"] for p in profs_cog.get_user_professions(self.user_id)] or None
 
-    @commands.hybrid_command(name="searchrecipe", description="Search the recipe catalog")
-    async def search_recipe_cmd(self, ctx: commands.Context, query: str, profession: str | None = None):
-        profs = [_norm_prof(profession)] if profession else None
-        hits = self.search_recipes(query, professions=profs, limit=25)
-        if not hits:
-            return await ctx.reply("🔎 No matches.", ephemeral=True)
-        lines = []
-        for h in hits[:10]:
-            lvl = f" (Lv {h['level']})" if h.get("level") else ""
-            link = f" — <{h['link']}>" if h.get("link") else ""
-            lines.append(f"• **{h['name']}** — *{h['profession']}*{lvl}{link}")
-        embed = discord.Embed(title=f"🔎 Results for “{query}”", description="\n".join(lines), color=discord.Color.green())
-        await ctx.reply(embed=embed, ephemeral=True)
+            matches = self.cog.search_recipes(self.query.value, prof_filter)
+            if not matches:
+                embed = discord.Embed(title="📗 Learn Recipe", description=f"⚠️ No recipes found for **{self.query.value}**.", color=discord.Color.red())
+                return await interaction.response.edit_message(embed=embed, view=None)
+
+            opts = []
+            for r in matches[:25]:
+                val = f"{r['name']}|{r.get('profession','Unknown')}|{r.get('link','')}"
+                opts.append(discord.SelectOption(label=r["name"][:100], description=f"{r.get('profession','Unknown')}", value=val))
+
+            view = self.cog._LearnSelectView(self.cog, self.user_id, opts)
+            embed = discord.Embed(title="📗 Select a Recipe to Learn", description=f"Found **{len(matches)}** matches.", color=discord.Color.green())
+            await interaction.response.edit_message(embed=embed, view=view)
+
+    class SearchRecipeModal(Modal, title="🔍 Search Recipes"):
+        def __init__(self, cog: "Recipes", user_id: int):
+            super().__init__(timeout=240)
+            self.cog = cog
+            self.user_id = user_id
+            self.query = TextInput(label="Search Term", placeholder="e.g. Phoenix Cloak", required=True)
+            self.add_item(self.query)
+
+        async def on_submit(self, interaction: discord.Interaction):
+            matches = self.cog.search_recipes(self.query.value)
+            e = discord.Embed(title=f"🔍 Results: {self.query.value}", color=discord.Color.purple())
+            if not matches:
+                e.description = "⚠️ No recipes found."
+            else:
+                for r in matches[:10]:
+                    link = r.get("link") or ""
+                    prof = r.get("profession", "Unknown")
+                    e.add_field(name=r.get("name", "Unknown"), value=f"**Profession:** {prof}\n{'[View Link](' + link + ')' if link else '—'}", inline=False)
+            await interaction.response.edit_message(embed=e, view=None)
+
+    # ---------------- Hub: buttons provider ----------------
+    def build_recipe_buttons(self, user_id: int) -> discord.ui.View:
+        v = View(timeout=240)
+        v.add_item(Button(label="📗 Learn Recipe", style=discord.ButtonStyle.success, custom_id=f"rc_learn_{user_id}"))
+        v.add_item(Button(label="📘 Learned", style=discord.ButtonStyle.primary, custom_id=f"rc_learned_{user_id}"))
+        v.add_item(Button(label="🔍 Search", style=discord.ButtonStyle.secondary, custom_id=f"rc_search_{user_id}"))
+        return v
+
+    # ---------------- Interaction listener ----------------
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        if not getattr(interaction, "data", None):
+            return
+        cid = interaction.data.get("custom_id")
+        if not cid or not isinstance(cid, str):
+            return
+
+        uid = interaction.user.id
+
+        if cid == f"rc_learn_{uid}":
+            modal = Recipes.LearnRecipeModal(self, uid)
+            return await interaction.response.send_modal(modal)
+
+        if cid == f"rc_learned_{uid}":
+            e = discord.Embed(title="📘 Learned Recipes", description="Select a profession to view recipes.", color=discord.Color.blue())
+            v = Recipes.ViewLearnedView(self, uid)
+            return await interaction.response.edit_message(embed=e, view=v)
+
+        if cid == f"rc_search_{uid}":
+            modal = Recipes.SearchRecipeModal(self, uid)
+            return await interaction.response.send_modal(modal)
 
 
-async def setup(bot):
+async def setup(bot: commands.Bot):
     await bot.add_cog(Recipes(bot))

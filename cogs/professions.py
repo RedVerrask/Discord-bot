@@ -1,176 +1,166 @@
+# cogs/professions.py
 import discord
 from discord.ext import commands
-import json
-import os
-import logging
+from discord.ui import View, Button, Modal, TextInput, Select
 from typing import Dict, List, Any
-from cogs.hub import refresh_hub  # live hub refresh
+from utils.data import load_json, save_json
+from cogs.hub import refresh_hub
 
-logger = logging.getLogger("AshesBot")
-PROFILES_FILE = "data/profiles.json"
-REGISTRY_FILE = "data/artisan_registry.json"
+PROFESSIONS_FILE = "data/professions.json"
 
-# Profession aliases for syncing with recipes.json and UI
-PROFESSION_ALIASES: Dict[str, str] = {
-    "Jeweler": "Jewelry",
-    "Scribe": "Scribing",
-    "Crafting": "Arcane Engineering",
-    "Armorsmithing": "Armor Smithing",
-    "Weaponsmithing": "Weapon Smithing",
-}
+# Standard tiers in Ashes of Creation
+TIERS = ["Novice", "Apprentice", "Journeyman", "Master", "Grandmaster"]
 
-TIER_COLORS = {
-    "1": "⚪",  # Novice
-    "2": "🟢",  # Apprentice
-    "3": "🔵",  # Journeyman
-    "4": "🟣",  # Master
-    "5": "🟠",  # Grandmaster
-}
-
-# -------------------- JSON HELPERS --------------------
-def _load_json(path: str, default: Any):
-    if not os.path.exists(path):
-        return default
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return default
-
-def _save_json(path: str, data: Any):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
-
-def load_profiles():
-    return _load_json(PROFILES_FILE, {})
-
-def save_profiles(data):
-    _save_json(PROFILES_FILE, data)
-
-def load_registry():
-    return _load_json(REGISTRY_FILE, {})
-
-def save_registry(data):
-    _save_json(REGISTRY_FILE, data)
-
-
-# ================================ Cog ================================
 class Professions(commands.Cog):
-    """Track each player's professions (max 2), tiers, and a guild registry."""
-    def __init__(self, bot):
+    """Handles user professions and tiers."""
+
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.profiles: Dict[str, Dict[str, Any]] = load_profiles()
-        self.artisan_registry: Dict[str, Dict[str, str]] = load_registry()
+        # { user_id: [ { "name": str, "tier": str } ] }
+        self.professions: Dict[str, List[Dict[str, str]]] = load_json(PROFESSIONS_FILE, {})
 
-    # ---------- core helpers ----------
-    def _norm(self, name: str) -> str:
-        return PROFESSION_ALIASES.get(name, name)
+    def _save(self):
+        save_json(PROFESSIONS_FILE, self.professions)
 
-    def get_profile(self, user_id: int) -> Dict[str, Any]:
-        uid = str(user_id)
-        if uid not in self.profiles:
-            self.profiles[uid] = {"professions": []}
-            save_profiles(self.profiles)
-        return self.profiles[uid]
-
+    # ---------------- Public API ----------------
     def get_user_professions(self, user_id: int) -> List[Dict[str, str]]:
-        return self.get_profile(user_id).get("professions", [])
+        return self.professions.get(str(user_id), [])
 
-    # ---------- embeds ----------
-    def build_user_professions_embed(self, member: discord.Member | discord.User):
-        profs = self.get_user_professions(member.id)
-        if not profs:
-            desc = "*You haven’t selected any professions yet.*"
-        else:
-            lines = []
-            for p in profs:
-                tier = str(p.get("tier", "1"))
-                lines.append(f"{TIER_COLORS.get(tier, '⚪')} **{p['name']}** — Tier {tier}")
-            desc = "\n".join(lines)
-        return discord.Embed(
-            title=f"🛠️ {getattr(member, 'display_name', member.id)} — Current Professions",
-            description=desc,
-            color=discord.Color.blurple()
-        )
-
-    # ---------- mutations ----------
-    def set_user_profession(self, user_id: int, profession: str, tier: str) -> bool:
-        """Assign/update profession; max 2 per user. Returns True if set."""
-        uid = str(user_id)
-        profile = self.get_profile(user_id)
-        profession = self._norm(profession)
-
-        # Enforce 2 profession limit
-        names = [p["name"] for p in profile["professions"]]
-        if profession not in names and len(names) >= 2:
+    def add_profession(self, user_id: int, name: str, tier: str = "Novice") -> bool:
+        profs = self.professions.setdefault(str(user_id), [])
+        if any(p["name"].lower() == name.lower() for p in profs):
             return False
-
-        # Replace if exists, otherwise add
-        profile["professions"] = [p for p in profile["professions"] if p["name"] != profession]
-        profile["professions"].append({"name": profession, "tier": str(max(1, min(int(tier), 5)))})
-        save_profiles(self.profiles)
-
-        # Update registry
-        self.artisan_registry.setdefault(profession, {})[uid] = str(tier)
-        save_registry(self.artisan_registry)
+        profs.append({"name": name, "tier": tier})
+        self._save()
         return True
 
-    def remove_user_profession(self, user_id: int, profession: str) -> bool:
-        uid = str(user_id)
-        profession = self._norm(profession)
+    def set_tier(self, user_id: int, name: str, tier: str) -> bool:
+        profs = self.professions.get(str(user_id), [])
+        for p in profs:
+            if p["name"].lower() == name.lower():
+                p["tier"] = tier
+                self._save()
+                return True
+        return False
 
-        profile = self.get_profile(user_id)
-        before = len(profile.get("professions", []))
-        profile["professions"] = [p for p in profile.get("professions", []) if p["name"] != profession]
-        changed = len(profile["professions"]) != before
-        if changed:
-            save_profiles(self.profiles)
+    def remove_profession(self, user_id: int, name: str) -> bool:
+        before = len(self.professions.get(str(user_id), []))
+        self.professions[str(user_id)] = [p for p in self.professions.get(str(user_id), []) if p["name"].lower() != name.lower()]
+        after = len(self.professions[str(user_id)])
+        if after < before:
+            self._save()
+            return True
+        return False
 
-        if profession in self.artisan_registry and uid in self.artisan_registry[profession]:
-            del self.artisan_registry[profession][uid]
-            if not self.artisan_registry[profession]:
-                self.artisan_registry.pop(profession, None)
-            save_registry(self.artisan_registry)
-        return changed
+    # ---------------- UI Modals ----------------
+    class AddProfessionModal(Modal, title="➕ Add Profession"):
+        def __init__(self, cog: "Professions", user_id: int):
+            super().__init__(timeout=180)
+            self.cog = cog
+            self.user_id = user_id
+            self.name = TextInput(label="Profession Name", placeholder="e.g. Blacksmith", required=True)
+            self.add_item(self.name)
 
-    # ---------- commands ----------
-    @commands.hybrid_command(name="professions", description="View your current professions.")
-    async def professions_cmd(self, ctx: commands.Context):
-        embed = self.build_user_professions_embed(ctx.author)
-        await ctx.reply(embed=embed, ephemeral=True)
+        async def on_submit(self, interaction: discord.Interaction):
+            added = self.cog.add_profession(self.user_id, self.name.value)
+            msg = f"✅ Added **{self.name.value}** as Novice." if added else f"⚠️ Already have profession **{self.name.value}**."
+            e = discord.Embed(title="Professions Updated", description=msg, color=discord.Color.orange())
+            await refresh_hub(interaction, section="professions")
 
-    @commands.hybrid_command(name="setprofession", description="Set or update your profession and tier.")
-    async def set_profession_cmd(self, ctx: commands.Context, profession: str, tier: int):
-        ok = self.set_user_profession(ctx.author.id, profession, str(tier))
-        if ok:
-            await ctx.reply(f"✅ Set **{self._norm(profession)}** to **Tier {max(1,min(tier,5))}**.", ephemeral=True)
-            # refresh hub panels
-            if getattr(ctx, "interaction", None):
-                await refresh_hub(ctx.interaction, ctx.author.id, section="professions")
-                await refresh_hub(ctx.interaction, ctx.author.id, section="profile")
-        else:
-            await ctx.reply("⚠️ You can only have up to **2 professions**.", ephemeral=True)
+    # ---------------- UI Views ----------------
+    class TierSelectView(View):
+        def __init__(self, cog: "Professions", user_id: int, prof_name: str):
+            super().__init__(timeout=180)
+            self.cog = cog
+            self.user_id = user_id
+            self.prof_name = prof_name
+            self.add_item(self._TierSelect(self.cog, self.user_id, self.prof_name))
 
-    @commands.hybrid_command(name="removeprofession", description="Remove one of your professions.")
-    async def remove_profession_cmd(self, ctx: commands.Context, profession: str):
-        changed = self.remove_user_profession(ctx.author.id, profession)
-        if changed:
-            await ctx.reply(f"🗑️ Removed **{self._norm(profession)}**.", ephemeral=True)
-            if getattr(ctx, "interaction", None):
-                await refresh_hub(ctx.interaction, ctx.author.id, section="professions")
-                await refresh_hub(ctx.interaction, ctx.author.id, section="profile")
-        else:
-            await ctx.reply("⚠️ You don't have that profession.", ephemeral=True)
+        class _TierSelect(Select):
+            def __init__(self, cog: "Professions", user_id: int, prof_name: str):
+                opts = [discord.SelectOption(label=t) for t in TIERS]
+                super().__init__(placeholder="Select new tier", options=opts, min_values=1, max_values=1)
+                self.cog = cog
+                self.user_id = user_id
+                self.prof_name = prof_name
 
-    @commands.hybrid_command(name="tiers", description="Show profession tier legend.")
-    async def tiers_cmd(self, ctx: commands.Context):
-        embed = discord.Embed(title="📜 Profession Tier Legend", color=discord.Color.blurple())
-        labels = {"1": "Novice", "2": "Apprentice", "3": "Journeyman", "4": "Master", "5": "Grandmaster"}
-        for t, emoji in TIER_COLORS.items():
-            embed.add_field(name=f"{emoji} {labels[t]}", value=f"**Tier {t}**", inline=True)
-        await ctx.reply(embed=embed, ephemeral=True)
+            async def callback(self, interaction: discord.Interaction):
+                new_tier = self.values[0]
+                self.cog.set_tier(self.user_id, self.prof_name, new_tier)
+                e = discord.Embed(title="Tier Updated", description=f"✅ {self.prof_name} → **{new_tier}**", color=discord.Color.orange())
+                await refresh_hub(interaction, section="professions")
+
+    class RemoveProfessionView(View):
+        def __init__(self, cog: "Professions", user_id: int):
+            super().__init__(timeout=180)
+            self.cog = cog
+            self.user_id = user_id
+            profs = self.cog.get_user_professions(user_id)
+            if not profs:
+                self.add_item(Button(label="No professions to remove", style=discord.ButtonStyle.secondary, disabled=True))
+            else:
+                for p in profs:
+                    self.add_item(self._RemoveBtn(self.cog, self.user_id, p["name"]))
+
+        class _RemoveBtn(Button):
+            def __init__(self, cog: "Professions", user_id: int, name: str):
+                super().__init__(label=f"Remove {name}", style=discord.ButtonStyle.danger)
+                self.cog = cog
+                self.user_id = user_id
+                self.name = name
+
+            async def callback(self, interaction: discord.Interaction):
+                self.cog.remove_profession(self.user_id, self.name)
+                await refresh_hub(interaction, section="professions")
+
+    # ---------------- Hub Buttons ----------------
+    def build_professions_buttons(self, user_id: int) -> discord.ui.View:
+        v = View(timeout=240)
+        v.add_item(Button(label="➕ Add Profession", style=discord.ButtonStyle.success, custom_id=f"prof_add_{user_id}"))
+        v.add_item(Button(label="⬆️ Change Tier", style=discord.ButtonStyle.primary, custom_id=f"prof_tier_{user_id}"))
+        v.add_item(Button(label="🗑 Remove Profession", style=discord.ButtonStyle.danger, custom_id=f"prof_remove_{user_id}"))
+        return v
+
+    # ---------------- Interaction Listener ----------------
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: discord.Interaction):
+        if not getattr(interaction, "data", None):
+            return
+        cid = interaction.data.get("custom_id")
+        if not cid or not isinstance(cid, str):
+            return
+
+        uid = interaction.user.id
+
+        if cid == f"prof_add_{uid}":
+            modal = Professions.AddProfessionModal(self, uid)
+            return await interaction.response.send_modal(modal)
+
+        if cid == f"prof_tier_{uid}":
+            profs = self.get_user_professions(uid)
+            if not profs:
+                return await interaction.response.send_message("⚠️ You have no professions to change.", ephemeral=True)
+            # If multiple, ask to pick
+            opts = [discord.SelectOption(label=p["name"], description=f"Current: {p['tier']}") for p in profs]
+            select = Select(placeholder="Select profession", options=opts, min_values=1, max_values=1)
+
+            async def select_cb(inter: discord.Interaction):
+                prof_name = select.values[0]
+                v = Professions.TierSelectView(self, uid, prof_name)
+                e = discord.Embed(title="Change Tier", description=f"Select new tier for **{prof_name}**", color=discord.Color.orange())
+                await inter.response.edit_message(embed=e, view=v)
+
+            select.callback = select_cb
+            v = View(timeout=180)
+            v.add_item(select)
+            e = discord.Embed(title="Choose Profession", description="Which profession’s tier do you want to change?", color=discord.Color.orange())
+            return await interaction.response.edit_message(embed=e, view=v)
+
+        if cid == f"prof_remove_{uid}":
+            e = discord.Embed(title="🗑 Remove Profession", description="Choose which to remove.", color=discord.Color.red())
+            v = Professions.RemoveProfessionView(self, uid)
+            return await interaction.response.edit_message(embed=e, view=v)
 
 
-async def setup(bot):
+async def setup(bot: commands.Bot):
     await bot.add_cog(Professions(bot))

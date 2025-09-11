@@ -1,1 +1,6 @@
-{}
+{
+  "1234567890": {
+    "classes": ["Bard", "Rogue"],
+    "wishlist": ["Obsidian Dagger", "Phoenix Cloak"]
+  }
+}
