@@ -3,8 +3,7 @@ from discord.ext import commands
 import json, os
 from cogs.professions import TIER_COLORS
 from cogs.professions import TIER_COLORS
-from cogs.professions_menu import ProfessionsMenu
-from cogs.market import MarketMenu
+from cogs.professions_menu import ProfessionsMenu 
 
 PROFILES_FILE = "data/profiles.json"
 
@@ -73,7 +72,8 @@ class Profile(commands.Cog):
         )
 
 # --------- UI ----------
-from cogs.market import MarketMenu
+
+
 
 class ProfileMenuView(discord.ui.View):
     def __init__(self, cog, user):
@@ -111,6 +111,10 @@ class ProfileMenuView(discord.ui.View):
             return await interaction.response.send_message("⚠️ This menu isn't yours!", ephemeral=True)
         market_cog = self.cog.bot.get_cog("Market")
         user_listings = market_cog.get_user_listings(interaction.user.id)
+        from cogs.market import MarketMenu  # ✅ Import only when needed
+        await interaction.response.send_message("💰 **Your Market Listings**",view=MarketMenu(market_cog, interaction.user),
+    ephemeral=True
+)
         if not user_listings:
             return await interaction.response.send_message("⚠️ You don’t have any active market listings.", ephemeral=True)
 

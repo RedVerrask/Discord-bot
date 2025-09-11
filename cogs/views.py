@@ -3,7 +3,6 @@ from cogs.professions_menu import ProfessionsMenu
 from cogs.profile import ProfileMenuView
 from cogs.recipes import RecipesMainView
 from cogs.market import MarketMenu
-
 class HomeView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
