@@ -75,6 +75,7 @@ class Professions(commands.Cog):
             async def callback(self, interaction: discord.Interaction):
                 profession = self.values[0]
                 self.cog.add_profession(self.user_id, profession)
+                await interaction.response.send_message(f"✅ Added **{profession}** at Novice.", ephemeral=True)
                 await refresh_hub(interaction, section="professions")
 
     class RemoveProfessionView(View):
@@ -99,6 +100,7 @@ class Professions(commands.Cog):
 
             async def callback(self, interaction: discord.Interaction):
                 self.cog.remove_profession(self.user_id, self.profession)
+                await interaction.response.send_message(f"🗑 Removed **{self.profession}**.", ephemeral=True)
                 await refresh_hub(interaction, section="professions")
 
     class ChangeTierView(View):
@@ -144,6 +146,7 @@ class Professions(commands.Cog):
             async def callback(self, interaction: discord.Interaction):
                 new_tier = self.values[0]
                 self.cog.set_tier(self.user_id, self.prof_name, new_tier)
+                await interaction.response.send_message(f"📈 {self.prof_name} updated to **{new_tier}**.", ephemeral=True)
                 await refresh_hub(interaction, section="professions")
 
     # ---------------- Hub Buttons ----------------

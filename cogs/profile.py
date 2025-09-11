@@ -15,6 +15,7 @@ CLASS_OPTIONS = [
     "Mage", "Summoner", "Cleric", "Bard"
 ]
 
+
 class Profile(commands.Cog):
     """Handles profiles, character info, and wishlists."""
 
@@ -113,9 +114,7 @@ class Profile(commands.Cog):
             self.add_item(self.item)
 
         async def on_submit(self, interaction: discord.Interaction):
-            added = self.cog.add_to_wishlist(self.user_id, self.item.value)
-            msg = f"✅ Added **{self.item.value}**." if added else f"⚠️ Already in wishlist."
-            e = discord.Embed(title="📌 Wishlist Updated", description=msg, color=discord.Color.green())
+            self.cog.add_to_wishlist(self.user_id, self.item.value)
             await refresh_hub(interaction, section="profile")
 
     class RemoveWishlistView(View):
@@ -164,19 +163,23 @@ class Profile(commands.Cog):
             return
         uid = interaction.user.id
 
+        # Edit character name
         if cid == f"pf_name_{uid}":
             modal = Profile.EditNameModal(self, uid)
             return await interaction.response.send_modal(modal)
 
+        # Choose primary/secondary classes
         if cid == f"pf_classes_{uid}":
             e = discord.Embed(title="🎭 Choose Classes", description="Pick your primary and secondary classes.", color=discord.Color.blurple())
             v = Profile.ChooseClassesView(self, uid)
             return await interaction.response.edit_message(embed=e, view=v)
 
+        # Add to wishlist
         if cid == f"pf_addwl_{uid}":
             modal = Profile.AddWishlistModal(self, uid)
             return await interaction.response.send_modal(modal)
 
+        # Remove from wishlist
         if cid == f"pf_remwl_{uid}":
             e = discord.Embed(title="🗑 Remove Wishlist Item", description="Select an item to remove.", color=discord.Color.red())
             v = Profile.RemoveWishlistView(self, uid)
